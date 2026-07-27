@@ -68,10 +68,10 @@ end
 ---@param buf integer
 ---@param err string
 function M.fail(buf, err)
-  msg(err, vim.log.levels.ERROR)
   if not vim.b[buf].ci_loaded then
-    M.set(buf, vim.split(err, '\n', { plain = true }))
+    M.set(buf, {})
   end
+  msg(err, vim.log.levels.ERROR)
 end
 
 ---@param buf integer

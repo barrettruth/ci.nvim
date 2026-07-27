@@ -46,7 +46,7 @@ describe('log.parse', function()
     local headers = {}
     for _, r in ipairs(rows) do
       if r.step then
-        headers[#headers + 1] = r.text:sub(r.conceal + 1)
+        headers[#headers + 1] = r.text:sub(r.ts + r.mark + 1)
       end
     end
     assert.same({ '✓ Set up job', '✓ Build', '✗ Test' }, headers)
@@ -85,8 +85,10 @@ describe('log.parse', function()
         plain = r
       end
     end
-    assert.equals(29, plain.conceal)
-    assert.equals('compiling', plain.text:sub(plain.conceal + 1))
+    assert.equals(29, plain.ts)
+    assert.equals(0, plain.mark)
+    assert.equals('compiling', plain.text:sub(plain.ts + 1))
+    assert.equals('00:00:10', plain.text:sub(12, 19))
   end)
 
   it('conceals timestamp and marker together', function()
@@ -96,8 +98,9 @@ describe('log.parse', function()
         group = r
       end
     end
-    assert.equals(29 + 9, group.conceal)
-    assert.equals('Runner Image', group.text:sub(group.conceal + 1))
+    assert.equals(29, group.ts)
+    assert.equals(9, group.mark)
+    assert.equals('Runner Image', group.text:sub(group.ts + group.mark + 1))
   end)
 
   it('lifts errors out of groups so folding never hides them', function()
@@ -107,15 +110,15 @@ describe('log.parse', function()
         hit = r
       end
     end
-    assert.equals('Process completed with exit code 1.', hit.text:sub(hit.conceal + 1))
+    assert.equals('Process completed with exit code 1.', hit.text:sub(hit.ts + hit.mark + 1))
     assert.equals('1', hit.fold)
   end)
 
   it('gives synthetic step headers a stamp of the same width, so columns line up', function()
     for _, r in ipairs(rows) do
-      assert.is_true(r.conceal >= 29)
+      assert.equals(29, r.ts)
       if r.step then
-        assert.equals(29, r.conceal)
+        assert.equals(0, r.mark)
         assert.truthy(r.text:match('^%d%d%d%d%-%d%d%-%d%dT[%d:]+%.0000000Z [^%s]'))
       end
     end
