@@ -59,7 +59,7 @@ luarocks install ci.nvim
 
 Inside a `ci://` buffer: `<CR>` opens the check under the cursor, `-` goes from
 a job back to its run, `gX` opens github.com, `g?` shows the mappings. There is
-no polling — `:e` refreshes.
+no polling — `:e` refreshes and keeps your place.
 
 `zM` in a job log collapses to the step list.
 

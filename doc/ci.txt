@@ -8,7 +8,7 @@ INTRODUCTION                                                    *ci* *ci.nvim*
 ci.nvim shows GitHub Actions status and logs for whatever you are working on,
 in a normal Neovim buffer with real highlighting and folds.
 
-It has one command, |:CI|, and no required configuration.
+It has one command, |:CI|, and no configuration.
 
 Logs are fetched from the raw Actions API, not `gh run view --log`, which
 replaces every escape byte with the literal characters `^[`. ANSI SGR
@@ -81,7 +81,12 @@ Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
     ci://{owner}/{repo}/pr/{number}
     ci://{owner}/{repo}/checks/{oid}
 <
-There is no polling. Press `:e` to refresh.
+There is no polling. Press `:e` to refresh; the cursor and scroll position are
+kept. Re-running |:CI| for a buffer that is already open just moves to its
+window without refetching.
+
+Window modifiers split rather than replace: `:vertical CI`, `:tab CI`,
+`:botright CI`. `:pedit ci://...` works too.
 
 A job buffer folds two levels: step, then `##[group]`. `zM` collapses to the
 step list, with each step's conclusion. The first failing step is opened and
@@ -92,28 +97,16 @@ MAPPINGS                                                         *ci-mappings*
 
 Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
 
-    <CR>    <Plug>(ci-open)    Open the check under the cursor. Checks that are
-                               not GitHub Actions jobs open in a browser.
-    -       <Plug>(ci-up)      From a job log, go to its run.
+    <CR>    <Plug>(ci-open)    In a checks list, open the check under the
+                               cursor. Checks that are not GitHub Actions jobs
+                               open in a browser.
+    -       <Plug>(ci-up)      In a job log, go to its run.
     gX      <Plug>(ci-web)     Open the current buffer on github.com.
     g?      <Plug>(ci-help)    This section.
 
 To rebind, map the |<Plug>| target and the default is skipped: >lua
     vim.keymap.set('n', '<C-]>', '<Plug>(ci-open)')
 <
-==============================================================================
-CONFIGURATION                                                      *ci-config*
-
-There is no `setup()` function. The only option is |vim.g.ci|: >lua
-    vim.g.ci = { gh = { 'gh' } }
-<
-                                                                    *vim.g.ci*
-    gh ~
-        string|string[], default `{ 'gh' }`
-
-        The GitHub CLI command. Useful for a wrapper script or an absolute
-        path.
-
 ==============================================================================
 HIGHLIGHTS                                                     *ci-highlights*
 

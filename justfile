@@ -9,7 +9,8 @@ format:
 
 lint:
     git ls-files '*.lua' | xargs selene --display-style quiet
-    lua-language-server --check lua/ --configpath "$(pwd)/.luarc.json" --checklevel=Warning
+    VIMRUNTIME="$(nvim --headless -c 'echo $VIMRUNTIME' -c q 2>&1 | tail -1)" \
+      lua-language-server --check lua/ --configpath "$(pwd)/.luarc.json" --checklevel=Warning
     vimdoc-language-server check doc/
 
 test:

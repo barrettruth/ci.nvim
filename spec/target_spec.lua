@@ -14,18 +14,17 @@ describe('target.parse', function()
   end)
 
   it('reads a job URL', function()
-    assert.same({
-      kind = 'job',
-      repo = 'o/r',
-      id = 22,
-      run = 11,
-    }, target.parse(GH .. '/actions/runs/11/job/22'))
+    assert.same(
+      { kind = 'job', repo = 'o/r', id = 22 },
+      target.parse(GH .. '/actions/runs/11/job/22')
+    )
   end)
 
-  it('reads a step fragment', function()
-    local t = target.parse(GH .. '/actions/runs/11/job/22#step:5:99')
-    assert.equals(5, t.step)
-    assert.equals(99, t.line)
+  it('ignores a step fragment', function()
+    assert.same(
+      { kind = 'job', repo = 'o/r', id = 22 },
+      target.parse(GH .. '/actions/runs/11/job/22#step:5:99')
+    )
   end)
 
   it('reads runs and attempts', function()
@@ -58,11 +57,6 @@ describe('target.parse', function()
       { kind = 'workflow', repo = 'o/r', file = 'ci.yml' },
       target.parse(GH .. '/actions/workflows/ci.yml')
     )
-  end)
-
-  it('round-trips ci:// URIs', function()
-    assert.same({ kind = 'job', repo = 'o/r', id = 22 }, target.parse('ci://o/r/job/22'))
-    assert.same({ kind = 'run', repo = 'o/r', id = 11 }, target.parse('ci://o/r/run/11'))
   end)
 
   it('rejects what it cannot serve', function()

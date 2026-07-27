@@ -2,6 +2,38 @@ local M = {}
 
 ---@alias ci.Bucket 'fail'|'attention'|'running'|'pending'|'pass'|'skipped'
 
+---@alias ci.Hl.Bucket 'CiPass'|'CiFail'|'CiRunning'|'CiPending'|'CiSkipped'|'CiAttention'
+---@alias ci.Hl ci.Hl.Bucket|'CiGroup'|'CiMuted'
+
+---@alias ci.gql.Status 'REQUESTED'|'QUEUED'|'IN_PROGRESS'|'COMPLETED'|'WAITING'|'PENDING'
+---@alias ci.rest.Status 'requested'|'queued'|'in_progress'|'completed'|'waiting'|'pending'
+---@alias ci.Status ci.gql.Status|ci.rest.Status
+
+---@alias ci.gql.Conclusion
+---| 'SUCCESS'
+---| 'FAILURE'
+---| 'NEUTRAL'
+---| 'CANCELLED'
+---| 'SKIPPED'
+---| 'TIMED_OUT'
+---| 'ACTION_REQUIRED'
+---| 'STARTUP_FAILURE'
+---| 'STALE'
+---| 'EXPECTED'
+---| 'ERROR'
+---| 'PENDING'
+
+---@alias ci.rest.Conclusion
+---| 'success'
+---| 'failure'
+---| 'neutral'
+---| 'cancelled'
+---| 'skipped'
+---| 'timed_out'
+---| 'action_required'
+
+---@alias ci.Conclusion ci.gql.Conclusion|ci.rest.Conclusion
+
 ---@type table<string, ci.Bucket>
 local BUCKET = {
   success = 'pass',
@@ -37,7 +69,7 @@ M.symbol = {
   attention = '!',
 }
 
----@type table<ci.Bucket, string>
+---@type table<ci.Bucket, ci.Hl.Bucket>
 M.hl = {
   pass = 'CiPass',
   fail = 'CiFail',
@@ -75,7 +107,7 @@ end
 ---@param status? string
 ---@param conclusion? string
 ---@return string symbol
----@return string hl_group
+---@return ci.Hl.Bucket hl_group
 ---@return ci.Bucket bucket
 function M.of(status, conclusion)
   local b = M.bucket(status, conclusion)

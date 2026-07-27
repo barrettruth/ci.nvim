@@ -9,7 +9,7 @@ local function err(msg)
   vim.notify('[ci]: ' .. msg, vim.log.levels.ERROR)
 end
 
----@return string?
+---@return string? name
 local function branch()
   local r = vim.system({ 'git', 'rev-parse', '--abbrev-ref', 'HEAD' }, { text = true }):wait()
   if r.code ~= 0 then
@@ -92,26 +92,32 @@ local function resolve(t, on_uri)
   end)
 end
 
----@param opts? table
-function M.run(opts)
-  opts = opts or {}
-  local arg = opts.args
+---@param arg? string
+---@param mods? vim.api.keyset.cmd.mods
+function M.run(arg, mods)
   if arg == '.' then
     arg = vim.fn.expand('<cWORD>')
+  end
+  if vim.fn.executable('gh') == 0 then
+    return err('gh is not on $PATH; see https://cli.github.com')
+  end
+  if arg and vim.startswith(arg, 'ci://') then
+    return buf_util.open(arg, mods)
   end
   local t, e = target.parse(arg)
   if not t then
     return err(e or ('cannot resolve: %s'):format(arg))
   end
   resolve(t, function(uri)
-    buf_util.open(uri, opts.mods)
+    buf_util.open(uri, mods)
   end)
 end
 
 ---@param buf? integer
----@return string?
+---@return string? url
 function M.url(buf)
   buf = buf or 0
+  ---@type ci.BufVar?
   local b = vim.b[buf].ci
   if b and b.url then
     return b.url

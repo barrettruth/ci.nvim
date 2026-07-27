@@ -2,7 +2,7 @@ local ansi = require('ci.ansi')
 
 ---@param s string
 ---@return string text
----@return integer[][] spans
+---@return ci.ansi.Span[] spans
 local function render(s)
   return ansi.line(s, {})
 end
