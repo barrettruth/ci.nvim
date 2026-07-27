@@ -21,17 +21,20 @@ local conceals = {}
 ---@type table<string, string>
 local dates = {}
 
---- "2026-07-27T15:14:08" -> "Mon 27 Jul 2026 15:14:08 GMT", which is 28 cells,
---- the stamp's width less its trailing space. Overlaying exactly that many
---- leaves the space to separate it from the log. The weekday needs real date
---- arithmetic, so it is resolved once per day rather than per line.
+---@type table<integer, table<integer, string>>
+local stamps = {}
+
+local time_ns = api.nvim_create_namespace('ci.time')
+
+--- "2026-07-27T15:14:08" -> "Mon, 27 Jul 2026 15:14:08 GMT". The weekday needs
+--- real date arithmetic, so it is resolved once per day rather than per line.
 ---@param at string
 ---@return string
 local function human(at)
   local day = at:sub(1, 10)
   local head = dates[day]
   if not head then
-    head = tostring(os.date('%a %d %b %Y ', vim.fn.strptime('%Y-%m-%d', day)))
+    head = tostring(os.date('%a, %d %b %Y ', vim.fn.strptime('%Y-%m-%d', day)))
     dates[day] = head
   end
   return head .. at:sub(12) .. ' GMT'
@@ -89,7 +92,6 @@ end
 ---@field hl? ci.Hl
 ---@field step? boolean
 ---@field conceal integer
----@field ts integer
 ---@field time? string
 
 --- Splits a job log into rows. Lines are kept whole, with an offset marking
@@ -109,17 +111,15 @@ function M.parse(text, steps)
   ---@param fold ci.log.Fold
   ---@param hl? ci.Hl
   ---@param step? boolean
-  local function emit(line, fold, hl, step, conceal, ts)
+  local function emit(line, fold, hl, step, conceal)
     conceal = conceal or 0
-    ts = ts or 0
     rows[#rows + 1] = {
       text = line,
       fold = fold,
       hl = hl,
       step = step,
       conceal = conceal,
-      ts = ts,
-      time = ts > 0 and human(line:sub(1, 19)) or nil,
+      time = conceal > 0 and human(line:sub(1, 19)) or nil,
     }
   end
 
@@ -132,7 +132,7 @@ function M.parse(text, steps)
       local s = steps[si]
       local sym, hl = status.of(s.status, s.conclusion)
       local stamp = s.at .. '.0000000Z '
-      emit(('%s%s %s'):format(stamp, sym, s.name), '>1', hl, true, #stamp, #stamp)
+      emit(('%s%s %s'):format(stamp, sym, s.name), '>1', hl, true, #stamp)
     end
     pending = {}
   end
@@ -167,18 +167,18 @@ function M.parse(text, steps)
       in_group = false
     elseif group then
       in_group = true
-      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group, ts)
+      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group)
     elseif err then
       in_group = false
-      emit(raw, '1', 'CiFail', nil, ts + #body - #err, ts)
+      emit(raw, '1', 'CiFail', nil, ts + #body - #err)
     elseif warn then
-      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn, ts)
+      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn)
     elseif notice then
-      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice, ts)
+      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice)
     elseif command then
-      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command, ts)
+      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
     elseif body ~= '' or #rows > 0 then
-      emit(raw, in_group and '2' or '1', nil, nil, ts, ts)
+      emit(raw, in_group and '2' or '1', nil, nil, ts)
     end
   end
 
@@ -224,7 +224,6 @@ end
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
 ---@field conceal integer
----@field ts integer
 ---@field time? string
 
 --- Renders {rows}, a chunk per tick, so a large log does not block.
@@ -251,7 +250,6 @@ local function paint(buf, gen, rows, done)
         hl = rows[k].hl,
         urls = urls(text),
         conceal = rows[k].conceal,
-        ts = rows[k].ts,
         time = rows[k].time,
       }
     end
@@ -262,15 +260,8 @@ local function paint(buf, gen, rows, done)
     buf_util.set(buf, lines)
     for k, m in ipairs(meta) do
       local prefix = math.min(m.conceal, #lines[k])
-      if m.time then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, {
-          end_col = m.ts - 1,
-          virt_text = { { m.time, 'CiMuted' } },
-          virt_text_pos = 'overlay',
-        })
-      end
-      if prefix > m.ts then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, m.ts, { end_col = prefix, conceal = '' })
+      if prefix > 0 then
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
       end
       if m.hl then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, { end_row = k, hl_group = m.hl })
@@ -323,6 +314,10 @@ function M.render(buf, gen, u)
     conceals[buf] = vim.tbl_map(function(r)
       return r.conceal
     end, rows)
+    stamps[buf] = {}
+    for i, r in ipairs(rows) do
+      stamps[buf][i] = r.time
+    end
     paint(buf, gen, rows, function()
       vim.b[buf].ci_loaded = true
       if reload then
@@ -369,6 +364,28 @@ end
 function M.forget(buf)
   levels[buf] = nil
   conceals[buf] = nil
+  stamps[buf] = nil
+end
+
+--- Shows or hides the timestamp column. Its own namespace, so flipping it
+--- leaves the ANSI highlights and the concealed prefix untouched.
+function M.timestamps()
+  local buf = api.nvim_get_current_buf()
+  if not stamps[buf] then
+    return
+  end
+  if vim.b[buf].ci_times then
+    api.nvim_buf_clear_namespace(buf, time_ns, 0, -1)
+    vim.b[buf].ci_times = false
+    return
+  end
+  for i, at in pairs(stamps[buf]) do
+    api.nvim_buf_set_extmark(buf, time_ns, i - 1, 0, {
+      virt_text = { { at .. ' ', 'CiMuted' } },
+      virt_text_pos = 'inline',
+    })
+  end
+  vim.b[buf].ci_times = true
 end
 
 return M

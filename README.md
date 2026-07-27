@@ -10,11 +10,6 @@
 One command, `:CI`, no configuration. Logs land in a normal Neovim buffer with
 real ANSI colours, two levels of folds, and the failing step already open.
 
-Logs come from the raw Actions API rather than `gh run view --log`, which
-replaces every escape byte with the literal characters `^[`. Escape sequences
-are parsed into extmarks instead of being handed to a terminal channel, so the
-buffer stays a text buffer — `/` search, folds, and yanking all work.
-
 ## Requirements
 
 - Neovim 0.11+
@@ -58,19 +53,8 @@ luarocks install ci.nvim
 ```
 
 Inside a `ci://` buffer: `<CR>` opens the check under the cursor, `-` goes from
-a job back to its run, `gX` opens github.com, `g?` shows the mappings. There is
-no polling — `:e` refreshes and keeps your place.
-
-`zM` in a job log collapses to the step list.
-
-## Forks
-
-Repository resolution is delegated entirely to `gh`, so pull requests from a
-fork resolve to the base repository, where their checks actually live. This
-matters: a fork with Actions enabled has its *own* runs for the same commit, so
-querying the wrong side returns a confident, wrong answer rather than an error.
-
-If `gh` picks the wrong repository, fix it once with `gh repo set-default`.
+a job back to its run, `gX` opens the checks on the remote, and `g?` shows the mappings.
+Refresh buffers with `:e`/`R`.
 
 ## Documentation
 
