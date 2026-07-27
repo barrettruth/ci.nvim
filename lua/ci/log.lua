@@ -106,6 +106,7 @@ function M.parse(text, steps)
     local err = body:match('^##%[error%](.*)$')
     local warn = body:match('^##%[warning%](.*)$')
     local notice = body:match('^##%[notice%](.*)$')
+    local command = body:match('^%[command%](.*)$')
 
     if not endgroup then
       flush()
@@ -123,6 +124,8 @@ function M.parse(text, steps)
       emit(warn, in_group and '2' or '1', 'CiAttention')
     elseif notice then
       emit(notice, in_group and '2' or '1', 'CiPending')
+    elseif command then
+      emit(command, in_group and '2' or '1', 'CiCommand')
     elseif body ~= '' or #rows > 0 then
       emit(body, in_group and '2' or '1')
     end
@@ -143,10 +146,32 @@ local function first_failure(rows)
   return nil
 end
 
+local URL = "https?://[%w%-%._~:/%?#%[%]@!%$&'%*%+,;=%%]+"
+
+---@param text string
+---@return ci.ansi.Span[]
+local function urls(text)
+  ---@type ci.ansi.Span[]
+  local out = {}
+  local from = 1
+  while true do
+    local a, b = text:find(URL, from)
+    if not a or not b then
+      return out
+    end
+    while b > a and text:sub(b, b):match('[%.,;:%)%]}>]') do
+      b = b - 1
+    end
+    out[#out + 1] = { a - 1, b, text:sub(a, b) }
+    from = b + 1
+  end
+end
+
 ---@class ci.log.Paint
 ---@field spans ci.ansi.Span[]
 ---@field links? string[]
 ---@field hl? ci.Hl
+---@field urls ci.ansi.Span[]
 
 ---@param buf integer
 ---@param gen integer
@@ -165,7 +190,7 @@ local function paint(buf, gen, rows, done)
     for k = i, last do
       local text, spans, links = ansi.line(rows[k].text, st)
       lines[k] = text
-      meta[k] = { spans = spans, links = links, hl = rows[k].hl }
+      meta[k] = { spans = spans, links = links, hl = rows[k].hl, urls = urls(text) }
     end
     i = last + 1
     if i <= #rows then
@@ -177,6 +202,13 @@ local function paint(buf, gen, rows, done)
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_row = k, hl_group = m.hl })
       end
       ansi.apply(buf, k - 1, m.spans, m.links, #lines[k])
+      for _, u in ipairs(m.urls) do
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, u[1], {
+          end_col = u[2],
+          hl_group = 'CiUrl',
+          url = u[3],
+        })
+      end
     end
     done()
   end
