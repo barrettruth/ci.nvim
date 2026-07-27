@@ -296,17 +296,6 @@ function M.render(buf, gen, u)
     if failed or not job or not text or not buf_util.current(buf, gen) then
       return
     end
-    local sym, hl = status.of(job.status, job.conclusion)
-    ---@type ci.BufVar
-    vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
-      title = job.name or '',
-      status = sym,
-      status_hl = hl,
-      workflow = job.workflow_name or '',
-      url = job.html_url or '',
-      run_id = job.run_id or 0,
-      up = job.run_id and ('ci://%s/run/%d'):format(u.repo, job.run_id) or nil,
-    })
     local rows = M.parse(text, usable_steps(job.steps))
     levels[buf] = vim.tbl_map(function(r)
       return r.fold
@@ -349,6 +338,19 @@ function M.render(buf, gen, u)
       return fail(err)
     end
     job = data
+    if buf_util.current(buf, gen) then
+      local sym, hl = status.of(job.status, job.conclusion)
+      ---@type ci.BufVar
+      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
+        title = job.name or '',
+        status = sym,
+        status_hl = hl,
+        workflow = job.workflow_name or '',
+        url = job.html_url or '',
+        run_id = job.run_id or 0,
+        up = job.run_id and ('ci://%s/run/%d'):format(u.repo, job.run_id) or nil,
+      })
+    end
     ready()
   end)
   gh.job_log(id, u.repo, function(out, err)
