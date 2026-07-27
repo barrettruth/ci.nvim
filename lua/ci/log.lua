@@ -21,15 +21,17 @@ local conceals = {}
 ---@type table<string, string>
 local dates = {}
 
---- "2026-07-27T15:14:08" -> "Mon, 27 Jul 2026 15:14:08 GMT". The weekday needs
---- real date arithmetic, so it is resolved once per day rather than per line.
+--- "2026-07-27T15:14:08" -> "Mon 27 Jul 2026 15:14:08 GMT", which is 28 cells,
+--- the stamp's width less its trailing space. Overlaying exactly that many
+--- leaves the space to separate it from the log. The weekday needs real date
+--- arithmetic, so it is resolved once per day rather than per line.
 ---@param at string
 ---@return string
 local function human(at)
   local day = at:sub(1, 10)
   local head = dates[day]
   if not head then
-    head = tostring(os.date('%a, %d %b %Y ', vim.fn.strptime('%Y-%m-%d', day)))
+    head = tostring(os.date('%a %d %b %Y ', vim.fn.strptime('%Y-%m-%d', day)))
     dates[day] = head
   end
   return head .. at:sub(12) .. ' GMT'
@@ -87,6 +89,7 @@ end
 ---@field hl? ci.Hl
 ---@field step? boolean
 ---@field conceal integer
+---@field ts integer
 ---@field time? string
 
 --- Splits a job log into rows. Lines are kept whole, with an offset marking
@@ -106,15 +109,17 @@ function M.parse(text, steps)
   ---@param fold ci.log.Fold
   ---@param hl? ci.Hl
   ---@param step? boolean
-  local function emit(line, fold, hl, step, conceal)
+  local function emit(line, fold, hl, step, conceal, ts)
     conceal = conceal or 0
+    ts = ts or 0
     rows[#rows + 1] = {
       text = line,
       fold = fold,
       hl = hl,
       step = step,
       conceal = conceal,
-      time = conceal > 0 and human(line:sub(1, 19)) or nil,
+      ts = ts,
+      time = ts > 0 and human(line:sub(1, 19)) or nil,
     }
   end
 
@@ -127,7 +132,7 @@ function M.parse(text, steps)
       local s = steps[si]
       local sym, hl = status.of(s.status, s.conclusion)
       local stamp = s.at .. '.0000000Z '
-      emit(('%s%s %s'):format(stamp, sym, s.name), '>1', hl, true, #stamp)
+      emit(('%s%s %s'):format(stamp, sym, s.name), '>1', hl, true, #stamp, #stamp)
     end
     pending = {}
   end
@@ -162,18 +167,18 @@ function M.parse(text, steps)
       in_group = false
     elseif group then
       in_group = true
-      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group)
+      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group, ts)
     elseif err then
       in_group = false
-      emit(raw, '1', 'CiFail', nil, ts + #body - #err)
+      emit(raw, '1', 'CiFail', nil, ts + #body - #err, ts)
     elseif warn then
-      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn)
+      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn, ts)
     elseif notice then
-      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice)
+      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice, ts)
     elseif command then
-      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
+      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command, ts)
     elseif body ~= '' or #rows > 0 then
-      emit(raw, in_group and '2' or '1', nil, nil, ts)
+      emit(raw, in_group and '2' or '1', nil, nil, ts, ts)
     end
   end
 
@@ -219,6 +224,7 @@ end
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
 ---@field conceal integer
+---@field ts integer
 ---@field time? string
 
 --- Renders {rows}, a chunk per tick, so a large log does not block.
@@ -245,6 +251,7 @@ local function paint(buf, gen, rows, done)
         hl = rows[k].hl,
         urls = urls(text),
         conceal = rows[k].conceal,
+        ts = rows[k].ts,
         time = rows[k].time,
       }
     end
@@ -255,13 +262,15 @@ local function paint(buf, gen, rows, done)
     buf_util.set(buf, lines)
     for k, m in ipairs(meta) do
       local prefix = math.min(m.conceal, #lines[k])
-      if prefix > 0 then
+      if m.time then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, {
-          end_col = prefix,
-          conceal = '',
-          virt_text = m.time and { { m.time .. ' ', 'CiMuted' } } or nil,
-          virt_text_pos = 'inline',
+          end_col = m.ts - 1,
+          virt_text = { { m.time, 'CiMuted' } },
+          virt_text_pos = 'overlay',
         })
+      end
+      if prefix > m.ts then
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, m.ts, { end_col = prefix, conceal = '' })
       end
       if m.hl then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, { end_row = k, hl_group = m.hl })
