@@ -27,10 +27,11 @@ end
 ---@param buf integer
 ---@param gen integer
 ---@param repo string
----@param header string
----@param header_hl ci.Hl.Bucket
+---@param summary string
+---@param title string
+---@param summary_hl ci.Hl.Bucket
 ---@param checks ci.Check[]
-local function paint(buf, gen, repo, header, header_hl, checks)
+local function paint(buf, gen, repo, summary, title, summary_hl, checks)
   if not buf_util.current(buf, gen) then
     return
   end
@@ -75,8 +76,9 @@ local function paint(buf, gen, repo, header, header_hl, checks)
   ---@type ci.BufVar
   vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
     repo = repo,
-    title = header,
-    status_hl = header_hl,
+    status = summary,
+    status_hl = summary_hl,
+    title = title,
     checks = map,
   })
   vim.b[buf].ci_loaded = true
@@ -119,8 +121,8 @@ local function from_rollup(buf, gen, repo, oid, label)
       return buf_util.fail(buf, err)
     end
     local text, hl = summarize(res.checks)
-    local head = ('%s  %s  %s'):format(text, res.oid:sub(1, 8), label or res.headline or '')
-    paint(buf, gen, res.repo or repo, (head:gsub('%s+$', '')), hl, res.checks)
+    local head = ('%s  %s'):format(res.oid:sub(1, 8), label or res.headline or '')
+    paint(buf, gen, res.repo or repo, text, (head:gsub('%s+$', '')), hl, res.checks)
   end)
 end
 
@@ -183,7 +185,7 @@ function M.render(buf, gen, u)
       local text, hl = summarize(checks)
       local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
         or ('run %d'):format(n)
-      paint(buf, gen, u.repo, ('%s  %s'):format(text, label), hl, checks)
+      paint(buf, gen, u.repo, text, label, hl, checks)
       local sha = jobs[1] and jobs[1].head_sha
       if sha then
         vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
