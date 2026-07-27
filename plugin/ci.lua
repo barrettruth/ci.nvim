@@ -11,6 +11,8 @@ local hl = {
   CiSkipped = 'Comment',
   CiAttention = 'DiagnosticWarn',
   CiGroup = 'Title',
+  CiCommand = 'Function',
+  CiUrl = 'Underlined',
   CiMuted = 'Comment',
 }
 for name, link in pairs(hl) do
