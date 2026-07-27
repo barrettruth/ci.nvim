@@ -88,6 +88,20 @@ A job buffer folds two levels: step, then `##[group]`. `zM` collapses to the
 step list, with each step's conclusion. The first failing step is opened and
 the cursor placed on it.
 
+Nothing is deleted from the log. Every line keeps its ISO 8601 timestamp and
+its `##[...]` marker; both are hidden with |conceal|, so |search()| and
+yanking still see them. Step headers are the one addition, and they carry a
+timestamp of the same width so the columns line up either way.
+
+To show the timestamps, as the gear menu on github.com does: >vim
+    :setlocal conceallevel=0
+< ANSI escapes are the only bytes actually removed, since they become
+highlights. For the log exactly as GitHub stores it: >
+    :term gh api repos/{owner}/{repo}/actions/jobs/{job_id}/logs
+<
+A failed fetch is reported with |:messages|, never written into the buffer, so
+a refresh that fails leaves what you were reading intact.
+
 ==============================================================================
 MAPPINGS                                                         *ci-mappings*
 
