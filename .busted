@@ -2,6 +2,7 @@ return {
   _all = {
     lua = 'nvim -l',
     ROOT = { './spec/' },
+    helper = './spec/helpers.lua',
   },
   default = {
     verbose = true,

@@ -35,15 +35,16 @@
             pkgs.selene
             pkgs.lua-language-server
             pkgs.vimdoc-language-server
+            pkgs.neovim
           ];
+          shell = pkgs.mkShell {
+            packages = devTools;
+            VIMRUNTIME = "${pkgs.neovim.unwrapped}/share/nvim/runtime";
+          };
         in
         {
-          default = pkgs.mkShell {
-            packages = devTools ++ [ pkgs.neovim ];
-          };
-          ci = pkgs.mkShell {
-            packages = devTools ++ [ pkgs.neovim ];
-          };
+          default = shell;
+          ci = shell;
         }
       );
     };
