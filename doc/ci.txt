@@ -13,11 +13,10 @@ CONTENTS                                                         *ci-contents*
   1. Introduction ....................................................... |ci|
   2. Requirements .......................................... |ci-requirements|
   3. Install .................................................... |ci-install|
-  4. Forgejo .................................................... |ci-forgejo|
-  5. Configuration ............................................... |ci-config|
-  6. Commands .................................................. |ci-commands|
-  7. Lua API ........................................................ |ci-api|
-  8. Health ...................................................... |ci-health|
+  4. Configuration ............................................... |ci-config|
+  5. Commands .................................................. |ci-commands|
+  6. Lua API ........................................................ |ci-api|
+  7. Health ...................................................... |ci-health|
 
 ==============================================================================
 REQUIREMENTS                                                 *ci-requirements*
@@ -34,15 +33,6 @@ With |vim.pack| (Neovim 0.12+): >lua
 < Or via luarocks: >
     luarocks install ci.nvim
 <
-==============================================================================
-FORGEJO                                                           *ci-forgejo*
-
-Development, issues, and pull requests happen on Forgejo: >
-    https://forge.barrettruth.com/barrettruth/ci.nvim
-<
-The GitHub repository is a read-only compatibility mirror. Use Forgejo for
-documentation, issues, pull requests, and active development.
-
 ==============================================================================
 CONFIGURATION                                                      *ci-config*
 
@@ -75,9 +65,6 @@ ci.setup({opts})        Configure ci.nvim. Called automatically when
 
                                                                     *ci.run()*
 ci.run()                Run ci.nvim.
-
-                                                             *ci.get_config()*
-ci.get_config()         Return the resolved configuration table.
 
 ==============================================================================
 HEALTH                                                             *ci-health*
