@@ -11,3 +11,6 @@ result
 result-*
 .direnv/
 .envrc
+
+.research/
+AGENTS.md
