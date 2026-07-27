@@ -288,6 +288,7 @@ end
 ---@class ci.gh.Job
 ---@field id integer
 ---@field run_id integer
+---@field head_sha? string
 ---@field name string
 ---@field status ci.rest.Status
 ---@field conclusion? ci.rest.Conclusion
