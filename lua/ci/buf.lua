@@ -1,4 +1,5 @@
 local ansi = require('ci.ansi')
+local msg = require('ci.msg')
 
 local api = vim.api
 
@@ -67,7 +68,7 @@ end
 ---@param buf integer
 ---@param err string
 function M.fail(buf, err)
-  vim.notify('[ci]: ' .. err, vim.log.levels.ERROR)
+  msg(err, vim.log.levels.ERROR)
   if not vim.b[buf].ci_loaded then
     M.set(buf, vim.split(err, '\n', { plain = true }))
   end
@@ -104,22 +105,33 @@ function M.forget(buf)
   require('ci.log').forget(buf)
 end
 
-local MAPS = {
-  { 'gX', 'web', 'Open on github.com' },
-  { 'g?', 'help', 'ci.nvim mappings' },
-  { '-', 'up', 'Go up a level' },
-  { '<CR>', 'open', 'Open the check under the cursor', 'list' },
-}
+---@param buf integer
+---@param lhs string
+---@param name string
+---@param desc string
+---@param opts? table
+local function map(buf, lhs, name, desc, opts)
+  local plug = '<Plug>(ci-' .. name .. ')'
+  if vim.fn.hasmapto(plug, 'n') == 0 then
+    vim.keymap.set(
+      'n',
+      lhs,
+      plug,
+      vim.tbl_extend('keep', opts or {}, { buffer = buf, remap = true, silent = true, desc = desc })
+    )
+  end
+end
 
 ---@param buf integer
 ---@param kind 'job'|'list'
 local function keymaps(buf, kind)
   api.nvim_buf_call(buf, function()
-    for _, m in ipairs(MAPS) do
-      local lhs, plug, desc, only = m[1], '<Plug>(ci-' .. m[2] .. ')', m[3], m[4]
-      if (not only or only == kind) and vim.fn.hasmapto(plug, 'n') == 0 then
-        vim.keymap.set('n', lhs, plug, { buffer = buf, remap = true, desc = desc })
-      end
+    map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
+    map(buf, '-', 'up', 'Go up a level')
+    map(buf, 'R', 'refresh', 'Reload this buffer')
+    map(buf, 'gX', 'web', 'Open on github.com')
+    if kind == 'list' then
+      map(buf, '<CR>', 'open', 'Open the check under the cursor')
     end
   end)
 end
@@ -159,14 +171,14 @@ function M.enter()
   if check.url then
     return vim.ui.open(check.url)
   end
-  vim.notify('[ci]: no logs for this check', vim.log.levels.WARN)
+  msg('no logs for this check', vim.log.levels.WARN)
 end
 
 function M.up()
   ---@type ci.BufVar?
   local b = vim.b[api.nvim_get_current_buf()].ci
   if not b or not b.up then
-    return vim.notify('[ci]: already at the top level', vim.log.levels.WARN)
+    return msg('already at the top level', vim.log.levels.WARN)
   end
   M.open(b.up, { keepalt = true })
 end

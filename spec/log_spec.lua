@@ -46,7 +46,7 @@ describe('log.parse', function()
     local headers = {}
     for _, r in ipairs(rows) do
       if r.step then
-        headers[#headers + 1] = r.text
+        headers[#headers + 1] = r.text:sub(r.conceal + 1)
       end
     end
     assert.same({ '✓ Set up job', '✓ Build', '✗ Test' }, headers)
@@ -60,22 +60,44 @@ describe('log.parse', function()
     end
   end)
 
-  it('nests groups one level deeper and drops the markers', function()
+  it('nests groups one level deeper', function()
     local group, inner
     for i, r in ipairs(rows) do
-      if r.text == 'Runner Image' then
+      if r.text:match('##%[group%]Runner Image$') then
         group, inner = r, rows[i + 1]
       end
-      assert.is_nil(r.text:match('^##%['))
     end
     assert.equals('>2', group.fold)
     assert.equals('2', inner.fold)
   end)
 
-  it('strips timestamps', function()
+  it('keeps every byte of the log line and conceals the prefix instead', function()
     for _, r in ipairs(rows) do
-      assert.is_nil(r.text:match('^%d%d%d%d%-%d%d%-%d%d'))
+      assert.truthy(r.text:match('^%d%d%d%d%-%d%d%-%d%dT'))
+      assert.equals(29, r.text:find('Z ') + 1)
     end
+  end)
+
+  it('conceals exactly the timestamp on an ordinary line', function()
+    local plain
+    for _, r in ipairs(rows) do
+      if r.text:match('compiling$') then
+        plain = r
+      end
+    end
+    assert.equals(29, plain.conceal)
+    assert.equals('compiling', plain.text:sub(plain.conceal + 1))
+  end)
+
+  it('conceals timestamp and marker together', function()
+    local group
+    for _, r in ipairs(rows) do
+      if r.text:match('##%[group%]Runner Image$') then
+        group = r
+      end
+    end
+    assert.equals(29 + 9, group.conceal)
+    assert.equals('Runner Image', group.text:sub(group.conceal + 1))
   end)
 
   it('lifts errors out of groups so folding never hides them', function()
@@ -85,8 +107,18 @@ describe('log.parse', function()
         hit = r
       end
     end
-    assert.equals('Process completed with exit code 1.', hit.text)
+    assert.equals('Process completed with exit code 1.', hit.text:sub(hit.conceal + 1))
     assert.equals('1', hit.fold)
+  end)
+
+  it('gives synthetic step headers a stamp of the same width, so columns line up', function()
+    for _, r in ipairs(rows) do
+      assert.is_true(r.conceal >= 29)
+      if r.step then
+        assert.equals(29, r.conceal)
+        assert.truthy(r.text:match('^%d%d%d%d%-%d%d%-%d%dT[%d:]+%.0000000Z [^%s]'))
+      end
+    end
   end)
 
   it('keeps step order when timestamps tie', function()

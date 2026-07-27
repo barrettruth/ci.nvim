@@ -97,6 +97,7 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
                                cursor. Checks that are not GitHub Actions jobs
                                open in a browser.
     -       <Plug>(ci-up)      In a job log, go to its run.
+    R       <Plug>(ci-refresh) Reload, same as `:e`.
     gX      <Plug>(ci-web)     Open the current buffer on github.com.
     g?      <Plug>(ci-help)    This section.
 
