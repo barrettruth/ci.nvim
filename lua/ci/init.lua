@@ -96,7 +96,8 @@ end
 ---@param mods? vim.api.keyset.cmd.mods
 function M.run(arg, mods)
   if arg == '.' then
-    arg = vim.fn.expand('<cWORD>')
+    arg = (vim.fn.expand('<cWORD>'):gsub('^[%(%[{<"\']+', ''))
+    arg = (arg:gsub('[%)%]}>.,;:"\']+$', ''))
   end
   if vim.fn.executable('gh') == 0 then
     return err('gh is not on $PATH; see https://cli.github.com')

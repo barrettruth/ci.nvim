@@ -11,7 +11,7 @@ local hl = {
   CiSkipped = 'Comment',
   CiAttention = 'DiagnosticWarn',
   CiGroup = 'Title',
-  CiCommand = 'Function',
+  CiCommand = 'Directory',
   CiUrl = 'Underlined',
   CiMuted = 'Comment',
 }
