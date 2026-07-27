@@ -98,7 +98,8 @@ are then hidden with |conceal|. Step headers are added for clarity.
 
 Show log timestamps (hidden by default) with `gS` or via setting
 `conceallevel` natively. The former is formatted for reading, the latter
-closer to the raw log (ISO timestamps, `##[...]` markers).
+uncovers the concealed prefixes (ISO timestamps, `##[...]` markers). Neither
+is the raw log; for that, see |:terminal| below.
 
 ANSI escapes are the only bytes actually removed, since they become
 highlights. Use the |:terminal| to view the log exactly as GitHub stores it: >

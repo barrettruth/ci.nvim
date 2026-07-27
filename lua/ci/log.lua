@@ -218,12 +218,22 @@ local function urls(text)
   end
 end
 
+--- How far github.com nests a line: a step's body sits under its header, a
+--- group's body under both. A line that opens a fold belongs to its parent.
+---@param fold ci.log.Fold
+---@return integer
+local function depth(fold)
+  local n = tonumber(fold:match('%d')) or 0
+  return fold:sub(1, 1) == '>' and n - 1 or n
+end
+
 ---@class ci.log.Paint
 ---@field spans ci.ansi.Span[]
 ---@field links? string[]
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
 ---@field conceal integer
+---@field indent integer
 ---@field time? string
 
 --- Renders {rows}, a chunk per tick, so a large log does not block.
@@ -250,6 +260,7 @@ local function paint(buf, gen, rows, done)
         hl = rows[k].hl,
         urls = urls(text),
         conceal = rows[k].conceal,
+        indent = depth(rows[k].fold),
         time = rows[k].time,
       }
     end
@@ -262,6 +273,12 @@ local function paint(buf, gen, rows, done)
       local prefix = math.min(m.conceal, #lines[k])
       if prefix > 0 then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
+      end
+      if m.indent > 0 and prefix < #lines[k] then
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, {
+          virt_text = { { ('  '):rep(m.indent) } },
+          virt_text_pos = 'inline',
+        })
       end
       if m.hl then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, { end_row = k, hl_group = m.hl })
