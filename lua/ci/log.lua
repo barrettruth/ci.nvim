@@ -364,7 +364,8 @@ function M.render(buf, gen, u)
         workflow = job.workflow_name or '',
         url = job.html_url or '',
         run_id = job.run_id or 0,
-        up = job.head_sha and ('ci://%s/checks/%s'):format(u.repo, job.head_sha) or nil,
+        up = vim.b[buf].ci.up
+          or (job.head_sha and ('ci://%s/checks/%s'):format(u.repo, job.head_sha) or nil),
       })
     end
     ready()

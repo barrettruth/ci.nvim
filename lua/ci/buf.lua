@@ -173,7 +173,11 @@ function M.enter()
     return
   end
   if check.job_id then
-    return M.open(('ci://%s/job/%d'):format(u.repo, check.job_id), { keepalt = true })
+    local from = api.nvim_buf_get_name(buf)
+    M.open(('ci://%s/job/%d'):format(u.repo, check.job_id), { keepalt = true })
+    local job = api.nvim_get_current_buf()
+    vim.b[job].ci = vim.tbl_extend('force', vim.b[job].ci, { up = from })
+    return
   end
   if check.url then
     return vim.ui.open(check.url)
@@ -205,9 +209,13 @@ function M.load(buf, uri)
   vim.bo[buf].undolevels = -1
   vim.bo[buf].modifiable = false
 
+  ---@type ci.BufVar?
+  local prev = vim.b[buf].ci
+
   ---@type ci.BufVar
   vim.b[buf].ci = {
     kind = u.kind == 'job' and 'job' or 'list',
+    up = prev and prev.up or nil,
     title = '',
     status = '',
     repo = u.repo,
