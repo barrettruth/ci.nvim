@@ -1,36 +1,21 @@
 local M = {}
 
----@return string[]
-function M.cmd()
-  local g = vim.g.ci
-  local c = type(g) == 'table' and g.gh or nil
-  if type(c) == 'string' then
-    return { c }
-  end
-  return vim.deepcopy(c or { 'gh' })
-end
-
 ---@param repo? string
 ---@return string owner
 ---@return string name
-function M.owner_name(repo)
-  if repo then
-    local o, n = repo:match('^([^/]+)/([^/]+)$')
-    if o then
-      return o, n
-    end
-  end
-  return '{owner}', '{repo}'
+local function owner_name(repo)
+  local o, n = (repo or ''):match('^([^/]+)/([^/]+)$')
+  return o or '{owner}', n or '{repo}'
 end
 
 ---@param repo? string
 ---@return string
-function M.slug(repo)
-  local o, n = M.owner_name(repo)
+local function slug(repo)
+  local o, n = owner_name(repo)
   return o .. '/' .. n
 end
 
----@param r table
+---@param r vim.SystemCompleted
 ---@return string
 local function errmsg(r)
   local s = vim.trim(r.stderr or '')
@@ -49,10 +34,8 @@ end
 
 ---@param args string[]
 ---@param on_done fun(out?: string, err?: string)
-function M.run(args, on_done)
-  local cmd = M.cmd()
-  vim.list_extend(cmd, args)
-  return vim.system(cmd, { text = true }, function(r)
+local function run(args, on_done)
+  return vim.system(vim.list_extend({ 'gh' }, args), { text = true }, function(r)
     vim.schedule(function()
       if r.code ~= 0 then
         on_done(nil, errmsg(r))
@@ -63,10 +46,11 @@ function M.run(args, on_done)
   end)
 end
 
+---@generic T
 ---@param args string[]
----@param on_done fun(data?: table, err?: string)
-function M.api(args, on_done)
-  return M.run(vim.list_extend({ 'api' }, args), function(out, err)
+---@param on_done fun(data?: T, err?: string)
+local function api(args, on_done)
+  return run(vim.list_extend({ 'api' }, args), function(out, err)
     if err then
       return on_done(nil, err)
     end
@@ -78,20 +62,21 @@ function M.api(args, on_done)
   end)
 end
 
+---@generic T
 ---@param query string
----@param vars table<string, string>
+---@param vars table<string, string|integer>
 ---@param repo? string
----@param on_done fun(data?: table, err?: string)
-function M.graphql(query, vars, repo, on_done)
-  local owner, name = M.owner_name(repo)
+---@param on_done fun(data?: T, err?: string)
+local function graphql(query, vars, repo, on_done)
+  local owner, name = owner_name(repo)
   local args = { 'graphql', '-F', 'owner=' .. owner, '-F', 'repo=' .. name }
   for k, v in pairs(vars) do
-    args[#args + 1] = '-f'
-    args[#args + 1] = k .. '=' .. v
+    args[#args + 1] = type(v) == 'number' and '-F' or '-f'
+    args[#args + 1] = k .. '=' .. tostring(v)
   end
   args[#args + 1] = '-f'
   args[#args + 1] = 'query=' .. query
-  return M.api(args, function(data, err)
+  return api(args, function(data, err)
     if err then
       return on_done(nil, err)
     end
@@ -117,7 +102,7 @@ query($owner:String!,$repo:String!,$expr:String!){
             nodes{
               __typename
               ... on CheckRun{
-                name status conclusion detailsUrl databaseId
+                name status conclusion detailsUrl databaseId startedAt
                 checkSuite{ workflowRun{ databaseId workflow{ name } } }
               }
               ... on StatusContext{ context state targetUrl description }
@@ -129,23 +114,45 @@ query($owner:String!,$repo:String!,$expr:String!){
   }
 }]]
 
+---@class ci.gh.CheckRunNode
+---@field __typename 'CheckRun'
+---@field name string
+---@field status ci.gql.Status
+---@field conclusion? ci.gql.Conclusion
+---@field detailsUrl string
+---@field databaseId? integer
+---@field startedAt? string
+---@field checkSuite? { workflowRun?: { workflow?: { name: string } } }
+
+---@class ci.gh.StatusContextNode
+---@field __typename 'StatusContext'
+---@field context string
+---@field state ci.gql.Conclusion
+---@field targetUrl? string
+
+---@alias ci.gh.RollupNode ci.gh.CheckRunNode|ci.gh.StatusContextNode
+
 ---@class ci.Check
 ---@field name string
----@field status? string
----@field conclusion? string
+---@field status? ci.Status
+---@field conclusion? ci.Conclusion
 ---@field url? string
 ---@field job_id? integer
 ---@field run_id? integer
 ---@field workflow? string
+---@field started_at? string
 
----@param nodes table[]
+---@param nodes? ci.gh.RollupNode[]
 ---@return ci.Check[]
 local function to_checks(nodes)
-  local out = {}
+  ---@type ci.Check[], table<string, integer>
+  local out, seen = {}, {}
   for _, n in ipairs(nodes or {}) do
+    ---@type ci.Check?
+    local c
     if n.__typename == 'CheckRun' then
       local run_id, job_id = (n.detailsUrl or ''):match('/actions/runs/(%d+)/job/(%d+)')
-      out[#out + 1] = {
+      c = {
         name = n.name,
         status = n.status,
         conclusion = n.conclusion,
@@ -153,29 +160,43 @@ local function to_checks(nodes)
         job_id = tonumber(job_id) or n.databaseId,
         run_id = tonumber(run_id),
         workflow = vim.tbl_get(n, 'checkSuite', 'workflowRun', 'workflow', 'name'),
+        started_at = n.startedAt,
       }
     elseif n.__typename == 'StatusContext' then
-      out[#out + 1] = {
-        name = n.context,
-        conclusion = n.state,
-        url = n.targetUrl,
-      }
+      c = { name = n.context, conclusion = n.state, url = n.targetUrl }
+    end
+    if c then
+      local key = (c.workflow or '') .. '\0' .. c.name
+      local prev = seen[key]
+      if not prev then
+        out[#out + 1] = c
+        seen[key] = #out
+      elseif (c.started_at or '') >= (out[prev].started_at or '') then
+        out[prev] = c
+      end
     end
   end
   return out
 end
 
+---@class ci.gh.Rollup
+---@field repo? string
+---@field oid string
+---@field headline string
+---@field state? ci.gql.Conclusion
+---@field checks ci.Check[]
+
 ---@param expr string
 ---@param repo? string
----@param on_done fun(res?: table, err?: string)
+---@param on_done fun(res?: ci.gh.Rollup, err?: string)
 function M.rollup(expr, repo, on_done)
-  return M.graphql(ROLLUP, { expr = expr }, repo, function(data, err)
+  return graphql(ROLLUP, { expr = expr }, repo, function(data, err)
     if err then
       return on_done(nil, err)
     end
     local obj = vim.tbl_get(data or {}, 'repository', 'object')
     if not obj or not obj.oid then
-      return on_done(nil, ('no such revision on %s: %s'):format(M.slug(repo), expr))
+      return on_done(nil, ('no such revision on %s: %s'):format(slug(repo), expr))
     end
     local rollup = obj.statusCheckRollup
     on_done({
@@ -199,16 +220,25 @@ query($owner:String!,$repo:String!,$head:String!){
   }
 }]]
 
+---@class ci.gh.Pr
+---@field number integer
+---@field title string
+---@field headRefOid string
+
+---@class ci.gh.BranchPr : ci.gh.Pr
+---@field headRepositoryOwner? { login: string }
+---@field repo? string
+
 ---@param branch string
 ---@param repo? string
----@param on_done fun(pr?: table, err?: string)
+---@param on_done fun(pr?: ci.gh.BranchPr, err?: string)
 function M.pr_for_branch(branch, repo, on_done)
-  return M.graphql(PR_FOR_BRANCH, { head = branch }, repo, function(data, err)
+  return graphql(PR_FOR_BRANCH, { head = branch }, repo, function(data, err)
     if err then
       return on_done(nil, err)
     end
     local me = vim.tbl_get(data or {}, 'viewer', 'login')
-    local slug = vim.tbl_get(data or {}, 'repository', 'nameWithOwner')
+    local owner = vim.tbl_get(data or {}, 'repository', 'nameWithOwner')
     local nodes = vim.tbl_get(data or {}, 'repository', 'pullRequests', 'nodes') or {}
     local mine, any
     for _, n in ipairs(nodes) do
@@ -219,7 +249,7 @@ function M.pr_for_branch(branch, repo, on_done)
     end
     local pr = mine or any
     if pr then
-      pr.repo = slug
+      pr.repo = owner
     end
     on_done(pr)
   end)
@@ -234,69 +264,68 @@ query($owner:String!,$repo:String!,$n:Int!){
 
 ---@param number integer
 ---@param repo? string
----@param on_done fun(pr?: table, err?: string)
+---@param on_done fun(pr?: ci.gh.Pr, err?: string)
 function M.pr_by_number(number, repo, on_done)
-  local owner, name = M.owner_name(repo)
-  local args = {
-    'graphql',
-    '-F',
-    'owner=' .. owner,
-    '-F',
-    'repo=' .. name,
-    '-F',
-    'n=' .. tostring(number),
-    '-f',
-    'query=' .. PR_BY_NUMBER,
-  }
-  return M.api(args, function(data, err)
+  return graphql(PR_BY_NUMBER, { n = number }, repo, function(data, err)
     if err then
       return on_done(nil, err)
     end
-    if data.errors and data.errors[1] then
-      return on_done(nil, data.errors[1].message)
-    end
-    local pr = vim.tbl_get(data, 'data', 'repository', 'pullRequest')
+    local pr = vim.tbl_get(data or {}, 'repository', 'pullRequest')
     if not pr then
-      return on_done(nil, ('no pull request #%d on %s'):format(number, M.slug(repo)))
+      return on_done(nil, ('no pull request #%d on %s'):format(number, slug(repo)))
     end
     on_done(pr)
   end)
 end
 
+---@class ci.gh.JobStep
+---@field name string
+---@field number integer
+---@field status ci.rest.Status
+---@field conclusion? ci.rest.Conclusion
+---@field started_at? string
+
+---@class ci.gh.Job
+---@field id integer
+---@field run_id integer
+---@field name string
+---@field status ci.rest.Status
+---@field conclusion? ci.rest.Conclusion
+---@field html_url? string
+---@field workflow_name? string
+---@field steps? ci.gh.JobStep[]
+
 ---@param id integer
 ---@param repo? string
----@param on_done fun(job?: table, err?: string)
+---@param on_done fun(job?: ci.gh.Job, err?: string)
 function M.job(id, repo, on_done)
-  return M.api({ ('repos/%s/actions/jobs/%d'):format(M.slug(repo), id) }, on_done)
+  return api({ ('repos/%s/actions/jobs/%d'):format(slug(repo), id) }, on_done)
 end
 
 ---@param id integer
 ---@param repo? string
 ---@param on_done fun(text?: string, err?: string)
 function M.job_log(id, repo, on_done)
-  return M.run(
-    { 'api', ('repos/%s/actions/jobs/%d/logs'):format(M.slug(repo), id) },
-    function(out, err)
-      if err then
-        if err:match('[Nn]ot [Ff]ound') or err:match('404') then
-          err = 'log unavailable: job is still running, was skipped, or its logs expired'
-        end
-        return on_done(nil, err)
+  return run({ 'api', ('repos/%s/actions/jobs/%d/logs'):format(slug(repo), id) }, function(out, err)
+    if err then
+      if err:match('[Nn]ot [Ff]ound') or err:match('404') then
+        err = 'log unavailable: job is still running, was skipped, or its logs expired'
       end
-      on_done((out:gsub('^\239\187\191', '')))
+      return on_done(nil, err)
     end
-  )
+    on_done((out:gsub('^\239\187\191', '')))
+  end)
 end
 
----@param run integer
+---@param id integer
 ---@param attempt? integer
 ---@param repo? string
----@param on_done fun(jobs?: table[], err?: string)
-function M.run_jobs(run, attempt, repo, on_done)
+---@param on_done fun(jobs?: ci.gh.Job[], err?: string)
+function M.run_jobs(id, attempt, repo, on_done)
   local path = attempt
-      and ('repos/%s/actions/runs/%d/attempts/%d/jobs'):format(M.slug(repo), run, attempt)
-    or ('repos/%s/actions/runs/%d/jobs?per_page=100'):format(M.slug(repo), run)
-  return M.api({ path }, function(data, err)
+      and ('repos/%s/actions/runs/%d/attempts/%d/jobs'):format(slug(repo), id, attempt)
+    or ('repos/%s/actions/runs/%d/jobs?per_page=100'):format(slug(repo), id)
+  return api({ path }, function(data, err)
     if err then
       return on_done(nil, err)
     end
@@ -304,20 +333,23 @@ function M.run_jobs(run, attempt, repo, on_done)
   end)
 end
 
+---@class ci.gh.WorkflowRun
+---@field id integer
+
 ---@param file string
 ---@param repo? string
----@param on_done fun(run?: table, err?: string)
+---@param on_done fun(run?: ci.gh.WorkflowRun, err?: string)
 function M.latest_run(file, repo, on_done)
-  local path = ('repos/%s/actions/workflows/%s/runs?per_page=1'):format(M.slug(repo), file)
-  return M.api({ path }, function(data, err)
+  local path = ('repos/%s/actions/workflows/%s/runs?per_page=1'):format(slug(repo), file)
+  return api({ path }, function(data, err)
     if err then
       return on_done(nil, err)
     end
-    local run = (data.workflow_runs or {})[1]
-    if not run then
+    local latest = (data.workflow_runs or {})[1]
+    if not latest then
       return on_done(nil, ('no runs for workflow %s'):format(file))
     end
-    on_done(run)
+    on_done(latest)
   end)
 end
 

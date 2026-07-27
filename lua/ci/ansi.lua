@@ -2,6 +2,9 @@ local api = vim.api
 
 local M = {}
 
+---@alias ci.ansi.Span [integer, integer, string]
+
+---@type integer
 M.ns = api.nvim_create_namespace('ci.ansi')
 
 local CUBE = { 0x00, 0x5f, 0x87, 0xaf, 0xd7, 0xff }
@@ -51,16 +54,16 @@ end
 ---@field fg? integer|string
 ---@field bg? integer|string
 ---@field bold? boolean
----@field dim? boolean
 ---@field italic? boolean
 ---@field underline? boolean
 ---@field reverse? boolean
 ---@field strike? boolean
 
+---@type table<string, string>, integer
 local cache, seq = {}, 0
 
 ---@param s ci.ansi.State
----@return string?
+---@return string? hl_group
 local function group(s)
   local bits = (s.bold and 1 or 0)
     + (s.italic and 2 or 0)
@@ -104,8 +107,7 @@ function M.reset_cache()
   cache, seq = {}, 0
 end
 
-local SET =
-  { [1] = 'bold', [2] = 'dim', [3] = 'italic', [4] = 'underline', [7] = 'reverse', [9] = 'strike' }
+local SET = { [1] = 'bold', [3] = 'italic', [4] = 'underline', [7] = 'reverse', [9] = 'strike' }
 local CLR = {
   [22] = 'bold',
   [23] = 'italic',
@@ -123,15 +125,12 @@ local function sgr(s, p)
   while i <= n do
     local c = p[i]
     if c == 0 then
-      s.fg, s.bg, s.bold, s.dim, s.italic, s.underline, s.reverse, s.strike =
-        nil, nil, nil, nil, nil, nil, nil, nil
+      s.fg, s.bg, s.bold, s.italic, s.underline, s.reverse, s.strike =
+        nil, nil, nil, nil, nil, nil, nil
     elseif SET[c] then
       s[SET[c]] = true
     elseif CLR[c] then
       s[CLR[c]] = nil
-      if c == 22 then
-        s.dim = nil
-      end
     elseif c >= 30 and c <= 37 then
       s.fg = c - 30
     elseif c >= 40 and c <= 47 then
@@ -159,7 +158,7 @@ local function sgr(s, p)
 end
 
 ---@param raw string
----@return integer[]
+---@return integer[] codes
 local function params(raw)
   local p = {}
   for tok in ((raw:gsub(':', ';')) .. ';'):gmatch('([^;]*);') do
@@ -176,7 +175,7 @@ local CSI = '\27%[[%d;:?]*[A-Za-z]'
 ---@param line string
 ---@param st ci.ansi.State
 ---@return string text
----@return integer[][] spans
+---@return ci.ansi.Span[] spans
 ---@return string[]? links
 function M.line(line, st)
   if not line:find('[\27\r\7\b\v\f]') then
@@ -184,6 +183,7 @@ function M.line(line, st)
     return line, hl and { { 0, #line, hl } } or {}
   end
   local esc = line:find('\27', 1, true)
+  ---@type string[]?
   local links
   line = line:gsub('\r$', '')
   if esc then
@@ -198,6 +198,7 @@ function M.line(line, st)
       :gsub('\27%][^\7\27]*\7', '')
   end
   line = line:gsub('[\7\b\v\f]', '')
+  ---@type string, ci.ansi.Span[]
   local text, spans = '', {}
   for segment in (line .. '\r'):gmatch('([^\r]*)\r') do
     local seg = segment:gsub(CSI, function(m)
@@ -205,6 +206,7 @@ function M.line(line, st)
         return ''
       end
     end)
+    ---@type string[], ci.ansi.Span[], integer
     local t, sp, pos = {}, {}, 1
     local len, from, hl = 0, 0, group(st)
     while true do
@@ -242,7 +244,7 @@ end
 
 ---@param buf integer
 ---@param row integer
----@param spans integer[][]
+---@param spans ci.ansi.Span[]
 ---@param links? string[]
 ---@param width integer
 function M.apply(buf, row, spans, links, width)

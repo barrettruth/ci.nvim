@@ -7,21 +7,6 @@ local api = vim.api
 
 local M = {}
 
----@type table<integer, table<integer, ci.Check>>
-local index = {}
-
----@param buf integer
----@param lnum integer
----@return ci.Check?
-function M.at(buf, lnum)
-  return (index[buf] or {})[lnum]
-end
-
----@param buf integer
-function M.forget(buf)
-  index[buf] = nil
-end
-
 ---@param a ci.Check
 ---@param b ci.Check
 ---@return boolean
@@ -34,11 +19,16 @@ local function order(a, b)
   return (a.name or '') < (b.name or '')
 end
 
+---@class ci.list.Mark
+---@field hl ci.Hl.Bucket
+---@field sym_end integer
+---@field suffix_col? integer
+
 ---@param buf integer
 ---@param gen integer
 ---@param repo string
 ---@param header string
----@param header_hl string
+---@param header_hl ci.Hl.Bucket
 ---@param checks ci.Check[]
 local function paint(buf, gen, repo, header, header_hl, checks)
   if not buf_util.current(buf, gen) then
@@ -52,6 +42,7 @@ local function paint(buf, gen, repo, header, header_hl, checks)
   end
   width = math.min(width, 60)
 
+  ---@type string[], table<integer, ci.list.Mark>, table<integer, ci.Check>
   local lines, marks, map = { header, '' }, {}, {}
   for _, c in ipairs(checks) do
     local sym, hl = status.of(c.status, c.conclusion)
@@ -60,7 +51,11 @@ local function paint(buf, gen, repo, header, header_hl, checks)
     local suffix = c.workflow or (c.job_id and '' or 'external')
     local text = ('%s %s%s  %s'):format(sym, name, (' '):rep(pad), suffix)
     lines[#lines + 1] = (text:gsub('%s+$', ''))
-    marks[#lines] = { hl, #sym, #suffix > 0 and #text - #suffix or nil }
+    marks[#lines] = {
+      hl = hl,
+      sym_end = #sym,
+      suffix_col = #suffix > 0 and #text - #suffix or nil,
+    }
     map[#lines] = c
   end
   if #checks == 0 then
@@ -68,30 +63,31 @@ local function paint(buf, gen, repo, header, header_hl, checks)
   end
 
   buf_util.set(buf, lines)
-  index[buf] = map
   api.nvim_buf_set_extmark(buf, ansi.ns, 0, 0, { end_row = 1, hl_group = header_hl })
   for lnum, m in pairs(marks) do
-    api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, 0, { end_col = m[2], hl_group = m[1] })
-    if m[3] then
-      api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, m[3], {
+    api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, 0, { end_col = m.sym_end, hl_group = m.hl })
+    if m.suffix_col then
+      api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, m.suffix_col, {
         end_col = #lines[lnum],
         hl_group = 'CiMuted',
       })
     end
   end
-  vim.b[buf].ci = {
-    kind = 'list',
+  ---@type ci.BufVar
+  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
     repo = repo,
     title = header,
-    status = '',
     status_hl = header_hl,
-  }
+    checks = map,
+  })
+  vim.b[buf].ci_loaded = true
 end
 
 ---@param checks ci.Check[]
----@return string
----@return string
+---@return string summary
+---@return ci.Hl.Bucket hl
 local function summarize(checks)
+  ---@type table<ci.Bucket, integer>, integer
   local counts, total = {}, #checks
   for _, c in ipairs(checks) do
     local b = status.bucket(c.status, c.conclusion)
@@ -117,11 +113,11 @@ end
 ---@param label? string
 local function from_rollup(buf, gen, repo, oid, label)
   gh.rollup(oid, repo, function(res, err)
-    if err then
-      return buf_util.fail(buf, err)
-    end
     if not buf_util.current(buf, gen) then
       return
+    end
+    if err then
+      return buf_util.fail(buf, err)
     end
     local text, hl = summarize(res.checks)
     local head = ('%s  %s  %s'):format(text, res.oid:sub(1, 8), label or res.headline or '')
@@ -129,9 +125,10 @@ local function from_rollup(buf, gen, repo, oid, label)
   end)
 end
 
----@param jobs table[]
+---@param jobs ci.gh.Job[]
 ---@return ci.Check[]
 local function jobs_to_checks(jobs)
+  ---@type ci.Check[]
   local out = {}
   for _, j in ipairs(jobs) do
     out[#out + 1] = {
@@ -151,8 +148,6 @@ end
 ---@param gen integer
 ---@param u ci.Uri
 function M.render(buf, gen, u)
-  buf_util.placeholder(buf, 'Loading checks...')
-
   if u.kind == 'checks' then
     return from_rollup(buf, gen, u.repo, u.id)
   end
@@ -163,11 +158,11 @@ function M.render(buf, gen, u)
       return buf_util.fail(buf, ('malformed PR number: %s'):format(u.id))
     end
     return gh.pr_by_number(n, u.repo, function(pr, err)
-      if err then
-        return buf_util.fail(buf, err)
-      end
       if not buf_util.current(buf, gen) then
         return
+      end
+      if err then
+        return buf_util.fail(buf, err)
       end
       from_rollup(buf, gen, u.repo, pr.headRefOid, ('#%d %s'):format(pr.number, pr.title))
     end)
@@ -179,11 +174,11 @@ function M.render(buf, gen, u)
       return buf_util.fail(buf, ('malformed run id: %s'):format(u.id))
     end
     return gh.run_jobs(n, u.attempt, u.repo, function(jobs, err)
-      if err then
-        return buf_util.fail(buf, err)
-      end
       if not buf_util.current(buf, gen) then
         return
+      end
+      if err then
+        return buf_util.fail(buf, err)
       end
       local checks = jobs_to_checks(jobs)
       local text, hl = summarize(checks)
