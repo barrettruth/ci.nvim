@@ -89,7 +89,10 @@ local function graphql(query, vars, repo, on_done)
   end)
 end
 
-local ROLLUP = [[
+--- A revision and its checks in one request: the commit it resolves to, the
+--- rollup state, and every context, Actions or otherwise. `databaseId` on a
+--- CheckRun is the Actions job id, which is what the log endpoint takes.
+local CHECKS_FOR_REV = [[
 query($owner:String!,$repo:String!,$expr:String!){
   repository(owner:$owner,name:$repo){
     nameWithOwner
@@ -197,7 +200,7 @@ end
 ---@param repo? string
 ---@param on_done fun(res?: ci.gh.Rollup, err?: string)
 function M.rollup(expr, repo, on_done)
-  return graphql(ROLLUP, { expr = expr }, repo, function(data, err)
+  return graphql(CHECKS_FOR_REV, { expr = expr }, repo, function(data, err)
     if err then
       return on_done(nil, err)
     end
@@ -216,6 +219,8 @@ function M.rollup(expr, repo, on_done)
   end)
 end
 
+--- Open PRs with this head branch, plus the viewer, so a fork PR can be told
+--- from a stranger's PR that happens to share the branch name.
 local PR_FOR_BRANCH = [[
 query($owner:String!,$repo:String!,$head:String!){
   viewer{ login }
@@ -264,6 +269,7 @@ function M.pr_for_branch(branch, repo, on_done)
   end)
 end
 
+--- Just enough of a PR to find its checks: its head commit.
 local PR_BY_NUMBER = [[
 query($owner:String!,$repo:String!,$n:Int!){
   repository(owner:$owner,name:$repo){

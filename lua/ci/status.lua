@@ -106,6 +106,8 @@ function M.bucket(status, conclusion)
   return 'pending'
 end
 
+--- Everything needed to draw one check: its glyph, its highlight, and the
+--- bucket both came from, which callers sort on.
 ---@param status? string
 ---@param conclusion? string
 ---@return string symbol
@@ -116,6 +118,8 @@ function M.of(status, conclusion)
   return M.symbol[b], M.hl[b], b
 end
 
+--- One line for the winbar, worst bucket first: "3 fail, 1 running, 12/16
+--- passing". Buckets with no checks are omitted.
 ---@param counts table<ci.Bucket, integer>
 ---@param total integer
 ---@return string
