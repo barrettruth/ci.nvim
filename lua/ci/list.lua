@@ -43,7 +43,7 @@ local function paint(buf, gen, repo, header, header_hl, checks)
   width = math.min(width, 60)
 
   ---@type string[], table<integer, ci.list.Mark>, table<integer, ci.Check>
-  local lines, marks, map = { header, '' }, {}, {}
+  local lines, marks, map = {}, {}, {}
   for _, c in ipairs(checks) do
     local sym, hl = status.of(c.status, c.conclusion)
     local name = c.name or '?'
@@ -63,7 +63,6 @@ local function paint(buf, gen, repo, header, header_hl, checks)
   end
 
   buf_util.set(buf, lines)
-  api.nvim_buf_set_extmark(buf, ansi.ns, 0, 0, { end_row = 1, hl_group = header_hl })
   for lnum, m in pairs(marks) do
     api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, 0, { end_col = m.sym_end, hl_group = m.hl })
     if m.suffix_col then
