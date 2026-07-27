@@ -9,7 +9,6 @@ local M = {}
 
 local TS = '^(%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%d)%.%d+Z (.*)$'
 local CHUNK = 1000
-local DATE, TIME, FRAC = 11, 19, 28
 
 ---@alias ci.log.Fold '0'|'1'|'2'|'>1'|'>2'
 
@@ -225,31 +224,12 @@ local function paint(buf, gen, rows, done)
     end
     buf_util.set(buf, lines)
     for k, m in ipairs(meta) do
-      local width = #lines[k]
-      local function hide(from, to)
-        if width > from then
-          api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, from, {
-            end_col = math.min(to, width),
-            conceal = '',
-          })
-        end
-      end
-      if m.ts > 0 then
-        hide(0, DATE)
-        hide(TIME, FRAC)
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, DATE, {
-          end_col = math.min(TIME, width),
-          hl_group = 'CiMuted',
-        })
-      end
-      if m.mark > 0 then
-        hide(m.ts, m.ts + m.mark)
+      local prefix = math.min(m.ts + m.mark, #lines[k])
+      if prefix > 0 then
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
       end
       if m.hl then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, math.min(m.ts + m.mark, width), {
-          end_row = k,
-          hl_group = m.hl,
-        })
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, { end_row = k, hl_group = m.hl })
       end
       ansi.apply(buf, k - 1, m.spans, m.links, #lines[k])
       for _, u in ipairs(m.urls) do
