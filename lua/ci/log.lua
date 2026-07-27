@@ -67,8 +67,7 @@ end
 ---@field fold ci.log.Fold
 ---@field hl? ci.Hl
 ---@field step? boolean
----@field ts integer
----@field mark integer
+---@field conceal integer
 
 ---@param text string
 ---@param steps ci.log.Step[]
@@ -84,9 +83,8 @@ function M.parse(text, steps)
   ---@param fold ci.log.Fold
   ---@param hl? ci.Hl
   ---@param step? boolean
-  local function emit(line, fold, hl, step, ts, mark)
-    rows[#rows + 1] =
-      { text = line, fold = fold, hl = hl, step = step, ts = ts or 0, mark = mark or 0 }
+  local function emit(line, fold, hl, step, conceal)
+    rows[#rows + 1] = { text = line, fold = fold, hl = hl, step = step, conceal = conceal or 0 }
   end
 
   local function flush()
@@ -133,16 +131,16 @@ function M.parse(text, steps)
       in_group = false
     elseif group then
       in_group = true
-      emit(raw, '>2', 'CiGroup', nil, ts, #body - #group)
+      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group)
     elseif err then
       in_group = false
-      emit(raw, '1', 'CiFail', nil, ts, #body - #err)
+      emit(raw, '1', 'CiFail', nil, ts + #body - #err)
     elseif warn then
-      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts, #body - #warn)
+      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn)
     elseif notice then
-      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts, #body - #notice)
+      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice)
     elseif command then
-      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts, #body - #command)
+      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
     elseif body ~= '' or #rows > 0 then
       emit(raw, in_group and '2' or '1', nil, nil, ts)
     end
@@ -189,8 +187,7 @@ end
 ---@field links? string[]
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
----@field ts integer
----@field mark integer
+---@field conceal integer
 
 ---@param buf integer
 ---@param gen integer
@@ -214,8 +211,7 @@ local function paint(buf, gen, rows, done)
         links = links,
         hl = rows[k].hl,
         urls = urls(text),
-        ts = rows[k].ts,
-        mark = rows[k].mark,
+        conceal = rows[k].conceal,
       }
     end
     i = last + 1
@@ -224,7 +220,7 @@ local function paint(buf, gen, rows, done)
     end
     buf_util.set(buf, lines)
     for k, m in ipairs(meta) do
-      local prefix = math.min(m.ts + m.mark, #lines[k])
+      local prefix = math.min(m.conceal, #lines[k])
       if prefix > 0 then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
       end
@@ -277,7 +273,7 @@ function M.render(buf, gen, u)
       return r.fold
     end, rows)
     conceals[buf] = vim.tbl_map(function(r)
-      return r.ts + r.mark
+      return r.conceal
     end, rows)
     paint(buf, gen, rows, function()
       vim.b[buf].ci_loaded = true
