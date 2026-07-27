@@ -1,0 +1,31 @@
+local helpers = require('spec.helpers')
+
+describe('ci', function()
+  before_each(function()
+    helpers.reset_config()
+  end)
+
+  describe('setup', function()
+    it('applies defaults', function()
+      local config = require('ci').get_config()
+      assert.is_false(config.debug)
+    end)
+
+    it('merges user options', function()
+      helpers.reset_config({ debug = true })
+      assert.is_true(require('ci').get_config().debug)
+    end)
+
+    it('rejects a non-table opts', function()
+      assert.has_error(function()
+        require('ci').setup('nope')
+      end)
+    end)
+
+    it('rejects a non-boolean debug', function()
+      assert.has_error(function()
+        require('ci').setup({ debug = 1 })
+      end)
+    end)
+  end)
+end)

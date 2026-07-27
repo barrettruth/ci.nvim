@@ -1,0 +1,89 @@
+*ci.txt* *ci.nvim.txt*                                          CI for Neovim
+
+Author:  Barrett Ruth <br@barrettruth.com> License: GPL-3.0
+
+==============================================================================
+INTRODUCTION                                                    *ci* *ci.nvim*
+
+ci.nvim brings CI to Neovim.
+
+==============================================================================
+CONTENTS                                                         *ci-contents*
+
+  1. Introduction ....................................................... |ci|
+  2. Requirements .......................................... |ci-requirements|
+  3. Install .................................................... |ci-install|
+  4. Forgejo .................................................... |ci-forgejo|
+  5. Configuration ............................................... |ci-config|
+  6. Commands .................................................. |ci-commands|
+  7. Lua API ........................................................ |ci-api|
+  8. Health ...................................................... |ci-health|
+
+==============================================================================
+REQUIREMENTS                                                 *ci-requirements*
+
+Neovim 0.11 or newer.
+
+==============================================================================
+INSTALL                                                           *ci-install*
+
+With |vim.pack| (Neovim 0.12+): >lua
+    vim.pack.add({
+      'https://forge.barrettruth.com/barrettruth/ci.nvim',
+    })
+< Or via luarocks: >
+    luarocks install ci.nvim
+<
+==============================================================================
+FORGEJO                                                           *ci-forgejo*
+
+Development, issues, and pull requests happen on Forgejo: >
+    https://forge.barrettruth.com/barrettruth/ci.nvim
+<
+The GitHub repository is a read-only compatibility mirror. Use Forgejo for
+documentation, issues, pull requests, and active development.
+
+==============================================================================
+CONFIGURATION                                                      *ci-config*
+
+Configure ci.nvim by setting |vim.g.ci| before the plugin loads: >lua
+    vim.g.ci = {
+      debug = false,
+    }
+<
+                                                                    *vim.g.ci*
+Fields:
+
+    debug ~
+        boolean|string, default `false`
+
+        Enable debug logging. When a string, log to that file path instead of
+        emitting |vim.notify()| messages.
+
+==============================================================================
+COMMANDS                                                         *ci-commands*
+
+                                                                         *:CI*
+:CI                     Run ci.nvim.
+
+==============================================================================
+LUA API                                                               *ci-api*
+
+                                                                  *ci.setup()*
+ci.setup({opts})        Configure ci.nvim. Called automatically when
+                        |vim.g.ci| is set.
+
+                                                                    *ci.run()*
+ci.run()                Run ci.nvim.
+
+                                                             *ci.get_config()*
+ci.get_config()         Return the resolved configuration table.
+
+==============================================================================
+HEALTH                                                             *ci-health*
+
+Run |:checkhealth| to verify the installation: >
+    :checkhealth ci
+<
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:
