@@ -72,25 +72,6 @@ querying the wrong side returns a confident, wrong answer rather than an error.
 
 If `gh` picks the wrong repository, fix it once with `gh repo set-default`.
 
-## Pickers
-
-None are shipped. `require('ci').checks(cb)` hands you plain tables:
-
-```lua
-vim.keymap.set('n', '<leader>ci', function()
-  require('ci').checks(function(checks, repo)
-    vim.ui.select(checks, {
-      prompt = 'CI',
-      format_item = function(c) return c.name end,
-    }, function(c)
-      if c and c.job_id then
-        vim.cmd.edit(('ci://%s/job/%d'):format(repo, c.job_id))
-      end
-    end)
-  end)
-end)
-```
-
 ## Documentation
 
 ```vim

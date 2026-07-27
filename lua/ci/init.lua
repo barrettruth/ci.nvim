@@ -136,21 +136,4 @@ function M.url(buf)
   return ('https://github.com/%s'):format(u.repo)
 end
 
----@param on_done fun(checks: ci.Check[], repo?: string)
-function M.checks(on_done)
-  local head = branch()
-  if not head then
-    return err('not in a git repository')
-  end
-  gh.pr_for_branch(head, nil, function(pr)
-    local expr = pr and pr.headRefOid or (head .. '^{commit}')
-    gh.rollup(expr, nil, function(res, e)
-      if e then
-        return err(e)
-      end
-      on_done(res.checks, res.repo)
-    end)
-  end)
-end
-
 return M

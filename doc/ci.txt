@@ -5,20 +5,18 @@ Author:  Barrett Ruth <br@barrettruth.com> License: GPL-3.0
 ==============================================================================
 INTRODUCTION                                                    *ci* *ci.nvim*
 
-ci.nvim shows GitHub Actions status and logs for whatever you are working on,
-in a normal Neovim buffer with real highlighting and folds.
+GitHub Actions status and logs for whatever you are working on. One command,
+|:CI|, and no configuration.
 
-It has one command, |:CI|, and no configuration.
-
-Logs are fetched from the raw Actions API, not `gh run view --log`, which
-replaces every escape byte with the literal characters `^[`. ANSI SGR
-sequences are parsed and applied as |extmarks|, so the buffer stays a text
-buffer: |search()|, folds, and yanking all behave normally.
+Logs come from the raw Actions API, not `gh run view --log`, which rewrites
+every escape byte as the literal characters `^[`. SGR sequences become
+|extmarks| rather than going to a terminal channel, so the buffer is an
+ordinary text buffer.
 
 ==============================================================================
 REQUIREMENTS                                                 *ci-requirements*
 
-- Neovim 0.11 or newer
+- Neovim 0.11+
 - The GitHub CLI, `gh`, authenticated (`gh auth login`)
 - `git`
 
@@ -64,7 +62,8 @@ COMMAND                                                          *ci-commands*
 
 :CI .                   Use the |<cWORD>| under the cursor as the argument.
 
-Window modifiers apply: `:vertical CI`, `:tab CI`.
+Window modifiers split rather than replace: `:vertical CI`, `:tab CI`,
+`:botright CI`. `:pedit ci://...` works too.
 
 Repository resolution is delegated entirely to `gh`, which means fork pull
 requests resolve to the base repository, where their checks actually live. If
@@ -84,9 +83,6 @@ Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
 There is no polling. Press `:e` to refresh; the cursor and scroll position are
 kept. Re-running |:CI| for a buffer that is already open just moves to its
 window without refetching.
-
-Window modifiers split rather than replace: `:vertical CI`, `:tab CI`,
-`:botright CI`. `:pedit ci://...` works too.
 
 A job buffer folds two levels: step, then `##[group]`. `zM` collapses to the
 step list, with each step's conclusion. The first failing step is opened and
@@ -124,35 +120,6 @@ All groups are links and can be overridden.
 Log colours come from the ANSI escapes in the log itself. The sixteen basic
 colours are emitted as indexed, so they follow your terminal palette, or
 `g:terminal_color_0` through `g:terminal_color_15` if you have set them.
-
-==============================================================================
-LUA API                                                               *ci-api*
-
-                                                                    *ci.run()*
-ci.run({opts})          Backs |:CI|. {opts} may have `args` and `mods`.
-
-                                                                 *ci.checks()*
-ci.checks({cb})         Calls {cb} with a list of checks for the current
-                        branch, and the resolved repository. Each check has
-                        `name`, `status`, `conclusion`, `url`, `job_id`,
-                        `run_id`, and `workflow`.
-
-                        ci.nvim ships no picker integration. Build one: >lua
-    vim.keymap.set('n', '<leader>ci', function()
-      require('ci').checks(function(checks, repo)
-        vim.ui.select(checks, {
-          prompt = 'CI',
-          format_item = function(c) return c.name end,
-        }, function(c)
-          if c and c.job_id then
-            vim.cmd.edit(('ci://%s/job/%d'):format(repo, c.job_id))
-          end
-        end)
-      end)
-    end)
-<
-                                                                    *ci.url()*
-ci.url({buf})           The github.com URL for a ci.nvim buffer, or nil.
 
 ==============================================================================
 HEALTH                                                             *ci-health*
