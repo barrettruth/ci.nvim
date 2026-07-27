@@ -4,7 +4,6 @@
 ---@class ci
 ---@field setup fun(opts?: table)
 ---@field run fun()
----@field get_config fun(): ci.Config
 local M = {}
 
 local log = require('ci.log')
@@ -27,11 +26,6 @@ function M.setup(opts)
 
   log.set_enabled(config.debug)
   log.dbg('initialized')
-end
-
----@return ci.Config
-function M.get_config()
-  return config
 end
 
 function M.run()

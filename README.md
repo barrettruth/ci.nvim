@@ -6,7 +6,6 @@
 > Development, issues, and pull requests happen on
 > [Forgejo](https://forge.barrettruth.com/barrettruth/ci.nvim).
 > GitHub is maintained as a read-only mirror.
-> See `:help ci-forgejo` for canonical project links.
 
 ## Requirements
 
