@@ -121,8 +121,8 @@ local function from_rollup(buf, gen, repo, oid, label)
       return buf_util.fail(buf, err)
     end
     local text, hl = summarize(res.checks)
-    local head = ('%s  %s'):format(res.oid:sub(1, 8), label or res.headline or '')
-    paint(buf, gen, res.repo or repo, text, (head:gsub('%s+$', '')), hl, res.checks)
+    local head = label and ('%s  %s'):format(res.oid:sub(1, 8), label) or res.headline or ''
+    paint(buf, gen, res.repo or repo, text, vim.trim(head), hl, res.checks)
   end)
 end
 
@@ -165,7 +165,7 @@ function M.render(buf, gen, u)
       if err then
         return buf_util.fail(buf, err)
       end
-      from_rollup(buf, gen, u.repo, pr.headRefOid, ('#%d %s'):format(pr.number, pr.title))
+      from_rollup(buf, gen, u.repo, pr.headRefOid, pr.title)
     end)
   end
 
