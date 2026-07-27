@@ -7,8 +7,8 @@
 > [Forgejo](https://forge.barrettruth.com/barrettruth/ci.nvim).
 > GitHub is maintained as a read-only mirror.
 
-One command, `:CI`, no configuration. Logs land in a normal Neovim buffer with
-real ANSI colours, two levels of folds, and the failing step already open.
+Experience the power of `:CI`. Native GHA logs in normal Neovim buffers with
+real ANSI colours, step-level folds, and more.
 
 ## Requirements
 
