@@ -1,47 +1,150 @@
----@class ci.Config
----@field debug boolean|string
+local buf_util = require('ci.buf')
+local gh = require('ci.gh')
+local target = require('ci.target')
 
----@class ci
----@field setup fun(opts?: table)
----@field run fun()
 local M = {}
 
-local log = require('ci.log')
+---@param msg string
+local function err(msg)
+  vim.notify('[ci]: ' .. msg, vim.log.levels.ERROR)
+end
 
----@type ci.Config
-local default_config = {
-  debug = false,
-}
+---@return string?
+local function branch()
+  local r = vim.system({ 'git', 'rev-parse', '--abbrev-ref', 'HEAD' }, { text = true }):wait()
+  if r.code ~= 0 then
+    return nil
+  end
+  local name = vim.trim(r.stdout or '')
+  return name ~= '' and name or nil
+end
 
----@type ci.Config
-local config = vim.deepcopy(default_config)
+---@param t ci.Target
+---@param on_uri fun(uri: string)
+local function resolve(t, on_uri)
+  if t.kind == 'job' then
+    return on_uri(('ci://%s/job/%d'):format(t.repo, t.id))
+  end
+
+  if t.kind == 'run' then
+    return on_uri(
+      t.attempt and ('ci://%s/run/%d/%d'):format(t.repo, t.id, t.attempt)
+        or ('ci://%s/run/%d'):format(t.repo, t.id)
+    )
+  end
+
+  if t.kind == 'pr' and t.number then
+    return on_uri(('ci://%s/pr/%d'):format(t.repo, t.number))
+  end
+
+  if t.kind == 'workflow' then
+    return gh.latest_run(t.file, t.repo, function(run, e)
+      if e then
+        return err(e)
+      end
+      on_uri(('ci://%s/run/%d'):format(t.repo, run.id))
+    end)
+  end
+
+  if t.kind == 'repo' then
+    return gh.rollup('HEAD^{commit}', t.repo, function(res, e)
+      if e then
+        return err(e)
+      end
+      on_uri(('ci://%s/checks/%s'):format(res.repo or t.repo, res.oid))
+    end)
+  end
+
+  if t.kind == 'rev' then
+    return gh.rollup(t.expr, t.repo, function(res, e)
+      if e then
+        return err(e)
+      end
+      on_uri(('ci://%s/checks/%s'):format(res.repo or t.repo, res.oid))
+    end)
+  end
+
+  local head = branch()
+  if not head then
+    return err('not in a git repository')
+  end
+  if head == 'HEAD' then
+    return gh.rollup('HEAD^{commit}', nil, function(res, e)
+      if e then
+        return err(e)
+      end
+      on_uri(('ci://%s/checks/%s'):format(res.repo, res.oid))
+    end)
+  end
+  gh.pr_for_branch(head, nil, function(pr, e)
+    if e then
+      return err(e)
+    end
+    if pr then
+      return on_uri(('ci://%s/pr/%d'):format(pr.repo, pr.number))
+    end
+    gh.rollup(head .. '^{commit}', nil, function(res, e2)
+      if e2 then
+        return err(('no open pull request for %s, and %s'):format(head, e2))
+      end
+      on_uri(('ci://%s/checks/%s'):format(res.repo, res.oid))
+    end)
+  end)
+end
 
 ---@param opts? table
-function M.setup(opts)
+function M.run(opts)
   opts = opts or {}
-  vim.validate('ci.setup opts', opts, 'table')
-  vim.validate('ci.setup opts.debug', opts.debug, { 'boolean', 'string' }, true)
-
-  config = vim.tbl_deep_extend('force', default_config, opts)
-
-  log.set_enabled(config.debug)
-  log.dbg('initialized')
+  local arg = opts.args
+  if arg == '.' then
+    arg = vim.fn.expand('<cWORD>')
+  end
+  local t, e = target.parse(arg)
+  if not t then
+    return err(e or ('cannot resolve: %s'):format(arg))
+  end
+  resolve(t, function(uri)
+    buf_util.open(uri, opts.mods)
+  end)
 end
 
-function M.run()
-  log.dbg('run')
-  vim.notify('[ci]: not implemented', vim.log.levels.WARN)
+---@param buf? integer
+---@return string?
+function M.url(buf)
+  buf = buf or 0
+  local b = vim.b[buf].ci
+  if b and b.url then
+    return b.url
+  end
+  local u = buf_util.parse(vim.api.nvim_buf_get_name(buf))
+  if not u then
+    return nil
+  end
+  if u.kind == 'pr' then
+    return ('https://github.com/%s/pull/%s/checks'):format(u.repo, u.id)
+  elseif u.kind == 'run' then
+    return ('https://github.com/%s/actions/runs/%s'):format(u.repo, u.id)
+  elseif u.kind == 'checks' then
+    return ('https://github.com/%s/commit/%s/checks'):format(u.repo, u.id)
+  end
+  return ('https://github.com/%s'):format(u.repo)
 end
 
-M._test = {
-  ---@diagnostic disable-next-line: assign-type-mismatch
-  reset = function()
-    config = vim.deepcopy(default_config)
-  end,
-}
-
-if vim.g.ci then
-  M.setup(vim.g.ci)
+---@param on_done fun(checks: ci.Check[], repo?: string)
+function M.checks(on_done)
+  local head = branch()
+  if not head then
+    return err('not in a git repository')
+  end
+  gh.pr_for_branch(head, nil, function(pr)
+    local expr = pr and pr.headRefOid or (head .. '^{commit}')
+    gh.rollup(expr, nil, function(res, e)
+      if e then
+        return err(e)
+      end
+      on_done(res.checks, res.repo)
+    end)
+  end)
 end
 
 return M
