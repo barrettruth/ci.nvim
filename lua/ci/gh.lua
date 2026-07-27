@@ -324,9 +324,6 @@ end
 function M.job_log(id, repo, on_done)
   return run({ 'api', ('repos/%s/actions/jobs/%d/logs'):format(slug(repo), id) }, function(out, err)
     if err then
-      if err:match('[Nn]ot [Ff]ound') or err:match('404') then
-        err = 'log unavailable: job is still running, was skipped, or its logs expired'
-      end
       return on_done(nil, err)
     end
     on_done((out:gsub('^\239\187\191', '')))

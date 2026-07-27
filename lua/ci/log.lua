@@ -280,6 +280,22 @@ local function paint(buf, gen, rows, done)
   step()
 end
 
+--- 404 is a log that was never written, 410 one that has aged out. Neither
+--- code says which, but the job does, so name its state rather than guess at
+--- the three it could have been.
+---@param err string
+---@param job ci.gh.Job
+---@return string
+local function no_log(err, job)
+  if err:match('410') or err:match('[Gg]one') then
+    return 'log expired'
+  end
+  if err:match('404') or err:match('[Nn]ot [Ff]ound') then
+    return ('no log: job is %s'):format(job.conclusion or job.status or 'unknown')
+  end
+  return err
+end
+
 ---@param buf integer
 ---@param gen integer
 ---@param u ci.Uri
@@ -290,8 +306,8 @@ function M.render(buf, gen, u)
   end
   local reload = vim.b[buf].ci_loaded
 
-  ---@type ci.gh.Job?, string?, boolean?
-  local job, text, failed
+  ---@type ci.gh.Job?, string?, string?, boolean?
+  local job, text, log_err, failed
   local function ready()
     if failed or not job or not text or not buf_util.current(buf, gen) then
       return
@@ -351,11 +367,18 @@ function M.render(buf, gen, u)
         up = job.run_id and ('ci://%s/run/%d'):format(u.repo, job.run_id) or nil,
       })
     end
+    if log_err then
+      return fail(no_log(log_err, job))
+    end
     ready()
   end)
   gh.job_log(id, u.repo, function(out, err)
     if err then
-      return fail(err)
+      log_err = err
+      if job then
+        fail(no_log(err, job))
+      end
+      return
     end
     text = out
     ready()
