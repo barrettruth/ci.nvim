@@ -29,9 +29,8 @@ end
 ---@param repo string
 ---@param summary string
 ---@param title string
----@param summary_hl ci.Hl.Bucket
 ---@param checks ci.Check[]
-local function paint(buf, gen, repo, summary, title, summary_hl, checks)
+local function paint(buf, gen, repo, summary, title, checks)
   if not buf_util.current(buf, gen) then
     return
   end
@@ -77,7 +76,6 @@ local function paint(buf, gen, repo, summary, title, summary_hl, checks)
   vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
     repo = repo,
     status = summary,
-    status_hl = summary_hl,
     title = title,
     checks = map,
   })
@@ -85,26 +83,15 @@ local function paint(buf, gen, repo, summary, title, summary_hl, checks)
 end
 
 ---@param checks ci.Check[]
----@return string summary
----@return ci.Hl.Bucket hl
+---@return string
 local function summarize(checks)
-  ---@type table<ci.Bucket, integer>, integer
-  local counts, total = {}, #checks
+  ---@type table<ci.Bucket, integer>
+  local counts = {}
   for _, c in ipairs(checks) do
     local b = status.bucket(c.status, c.conclusion)
     counts[b] = (counts[b] or 0) + 1
   end
-  local worst = 'pass'
-  for _, b in ipairs({ 'fail', 'attention', 'running', 'pending', 'skipped' }) do
-    if (counts[b] or 0) > 0 then
-      worst = b
-      break
-    end
-  end
-  if total == 0 then
-    worst = 'pending'
-  end
-  return status.summary(counts, total), status.hl[worst]
+  return status.summary(counts, #checks)
 end
 
 ---@param buf integer
@@ -121,9 +108,9 @@ local function from_rollup(buf, gen, repo, oid, label, url)
     if err then
       return buf_util.fail(buf, err)
     end
-    local text, hl = summarize(res.checks)
+    local text = summarize(res.checks)
     local head = label and ('%s  %s'):format(res.oid:sub(1, 8), label) or res.headline or ''
-    paint(buf, gen, res.repo or repo, text, vim.trim(head), hl, res.checks)
+    paint(buf, gen, res.repo or repo, text, vim.trim(head), res.checks)
     vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
       url = url or ('https://github.com/%s/commit/%s/checks'):format(res.repo or repo, res.oid),
     })
@@ -193,10 +180,10 @@ function M.render(buf, gen, u)
         return buf_util.fail(buf, err)
       end
       local checks = jobs_to_checks(jobs)
-      local text, hl = summarize(checks)
+      local text = summarize(checks)
       local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
         or ('run %d'):format(n)
-      paint(buf, gen, u.repo, text, label, hl, checks)
+      paint(buf, gen, u.repo, text, label, checks)
       local sha = jobs[1] and jobs[1].head_sha
       local page = ('https://github.com/%s/actions/runs/%d'):format(u.repo, n)
       vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {

@@ -360,8 +360,7 @@ function M.render(buf, gen, u)
       ---@type ci.BufVar
       vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
         title = job.name or '',
-        status = sym,
-        status_hl = hl,
+        status = status.paint(hl, sym),
         workflow = job.workflow_name or '',
         url = job.html_url or '',
         run_id = job.run_id or 0,
