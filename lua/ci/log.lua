@@ -240,6 +240,7 @@ function M.render(buf, gen, u)
       workflow = job.workflow_name or '',
       url = job.html_url or '',
       run_id = job.run_id or 0,
+      up = job.run_id and ('ci://%s/run/%d'):format(u.repo, job.run_id) or nil,
     })
     local rows = M.parse(text, usable_steps(job.steps))
     levels[buf] = vim.tbl_map(function(r)
