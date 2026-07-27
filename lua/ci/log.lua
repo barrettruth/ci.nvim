@@ -15,6 +15,17 @@ local CHUNK = 1000
 ---@type table<integer, ci.log.Fold[]>
 local levels = {}
 
+---@type table<integer, integer[]>
+local conceals = {}
+
+---@return string
+function M.foldtext()
+  local buf = api.nvim_get_current_buf()
+  local n = (conceals[buf] or {})[vim.v.foldstart] or 0
+  local line = api.nvim_buf_get_lines(buf, vim.v.foldstart - 1, vim.v.foldstart, false)[1] or ''
+  return ('%s  %d lines'):format(line:sub(n + 1), vim.v.foldend - vim.v.foldstart + 1)
+end
+
 ---@param lnum integer
 ---@return ci.log.Fold
 function M.fold(lnum)
@@ -56,6 +67,7 @@ end
 ---@field fold ci.log.Fold
 ---@field hl? ci.Hl
 ---@field step? boolean
+---@field conceal integer
 
 ---@param text string
 ---@param steps ci.log.Step[]
@@ -71,8 +83,8 @@ function M.parse(text, steps)
   ---@param fold ci.log.Fold
   ---@param hl? ci.Hl
   ---@param step? boolean
-  local function emit(line, fold, hl, step)
-    rows[#rows + 1] = { text = line, fold = fold, hl = hl, step = step }
+  local function emit(line, fold, hl, step, conceal)
+    rows[#rows + 1] = { text = line, fold = fold, hl = hl, step = step, conceal = conceal or 0 }
   end
 
   local function flush()
@@ -83,7 +95,8 @@ function M.parse(text, steps)
     for _, si in ipairs(pending) do
       local s = steps[si]
       local sym, hl = status.of(s.status, s.conclusion)
-      emit(('%s %s'):format(sym, s.name), '>1', hl, true)
+      local stamp = s.at .. '.0000000Z '
+      emit(('%s%s %s'):format(stamp, sym, s.name), '>1', hl, true, #stamp)
     end
     pending = {}
   end
@@ -112,22 +125,24 @@ function M.parse(text, steps)
       flush()
     end
 
+    local ts = #raw - #body
+
     if endgroup then
       in_group = false
     elseif group then
       in_group = true
-      emit(group, '>2', 'CiGroup')
+      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group)
     elseif err then
       in_group = false
-      emit(err, '1', 'CiFail')
+      emit(raw, '1', 'CiFail', nil, ts + #body - #err)
     elseif warn then
-      emit(warn, in_group and '2' or '1', 'CiAttention')
+      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn)
     elseif notice then
-      emit(notice, in_group and '2' or '1', 'CiPending')
+      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice)
     elseif command then
-      emit(command, in_group and '2' or '1', 'CiCommand')
+      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
     elseif body ~= '' or #rows > 0 then
-      emit(body, in_group and '2' or '1')
+      emit(raw, in_group and '2' or '1', nil, nil, ts)
     end
   end
 
@@ -172,6 +187,7 @@ end
 ---@field links? string[]
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
+---@field conceal integer
 
 ---@param buf integer
 ---@param gen integer
@@ -190,7 +206,13 @@ local function paint(buf, gen, rows, done)
     for k = i, last do
       local text, spans, links = ansi.line(rows[k].text, st)
       lines[k] = text
-      meta[k] = { spans = spans, links = links, hl = rows[k].hl, urls = urls(text) }
+      meta[k] = {
+        spans = spans,
+        links = links,
+        hl = rows[k].hl,
+        urls = urls(text),
+        conceal = rows[k].conceal,
+      }
     end
     i = last + 1
     if i <= #rows then
@@ -198,6 +220,12 @@ local function paint(buf, gen, rows, done)
     end
     buf_util.set(buf, lines)
     for k, m in ipairs(meta) do
+      if m.conceal > 0 then
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, {
+          end_col = math.min(m.conceal, #lines[k]),
+          conceal = '',
+        })
+      end
       if m.hl then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_row = k, hl_group = m.hl })
       end
@@ -246,6 +274,9 @@ function M.render(buf, gen, u)
     levels[buf] = vim.tbl_map(function(r)
       return r.fold
     end, rows)
+    conceals[buf] = vim.tbl_map(function(r)
+      return r.conceal
+    end, rows)
     paint(buf, gen, rows, function()
       vim.b[buf].ci_loaded = true
       if reload then
@@ -291,6 +322,7 @@ end
 ---@param buf integer
 function M.forget(buf)
   levels[buf] = nil
+  conceals[buf] = nil
 end
 
 return M

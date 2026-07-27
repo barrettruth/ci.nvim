@@ -67,6 +67,9 @@ vim.api.nvim_create_autocmd({ 'BufWinEnter', 'BufReadPost' }, {
       vim.wo[0][0].foldmethod = 'expr'
       vim.wo[0][0].foldexpr = 'v:lua.require("ci.log").fold(v:lnum)'
       vim.wo[0][0].foldlevel = 0
+      vim.wo[0][0].conceallevel = 3
+      vim.wo[0][0].concealcursor = 'nvic'
+      vim.wo[0][0].foldtext = 'v:lua.require("ci.log").foldtext()'
     end
   end,
 })
@@ -121,7 +124,8 @@ plug('web', 'Open on github.com', function()
   if url then
     vim.ui.open(url)
   else
-    vim.notify('[ci]: no URL for this buffer', vim.log.levels.WARN)
+    require('ci.msg')('no URL for this buffer', vim.log.levels.WARN)
   end
 end)
 plug('help', 'ci.nvim mappings', '<cmd>help ci-mappings<cr>')
+plug('refresh', 'Reload this buffer', '<cmd>edit<cr>')

@@ -1,12 +1,13 @@
 local buf_util = require('ci.buf')
 local gh = require('ci.gh')
+local msg = require('ci.msg')
 local target = require('ci.target')
 
 local M = {}
 
----@param msg string
-local function err(msg)
-  vim.notify('[ci]: ' .. msg, vim.log.levels.ERROR)
+---@param m string
+local function err(m)
+  msg(m, vim.log.levels.ERROR)
 end
 
 ---@return string? name
