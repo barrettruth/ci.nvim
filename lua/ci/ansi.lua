@@ -172,6 +172,8 @@ end
 
 local CSI = '\27%[[%d;:?]*[A-Za-z]'
 
+--- Strips escapes from {line} and reports where the highlights go. {st} is
+--- carried across lines, since SGR state spans them.
 ---@param line string
 ---@param st ci.ansi.State
 ---@return string text

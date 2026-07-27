@@ -50,6 +50,8 @@ function M.parse(uri)
   }
 end
 
+--- Whether {gen} is still the buffer's newest load. Lets an in-flight request
+--- discard itself when the buffer has since reloaded or been wiped.
 ---@param buf integer
 ---@param gen integer
 ---@return boolean
@@ -74,6 +76,8 @@ function M.fail(buf, err)
   msg(err, vim.log.levels.ERROR)
 end
 
+--- Records the view of every window showing {buf}. Called on |BufUnload|,
+--- which still sees the old content; by |BufReadCmd| the buffer is empty.
 ---@param buf integer
 function M.save_view(buf)
   local saved = {}
@@ -136,6 +140,8 @@ local function keymaps(buf, kind)
   end)
 end
 
+--- Shows {uri}, splitting only if {mods} asks for it. An already-visible
+--- buffer is jumped to rather than reloaded.
 ---@param uri string
 ---@param mods? vim.api.keyset.cmd.mods
 function M.open(uri, mods)

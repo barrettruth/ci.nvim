@@ -18,6 +18,8 @@ local levels = {}
 ---@type table<integer, integer[]>
 local conceals = {}
 
+--- Backs 'foldtext', which conceal does not apply to: without this the raw
+--- timestamp and marker leak into every closed fold.
 ---@return string
 function M.foldtext()
   local buf = api.nvim_get_current_buf()
@@ -70,6 +72,9 @@ end
 ---@field ts integer
 ---@field mark integer
 
+--- Splits a job log into rows. Lines are kept whole, with an offset marking
+--- the timestamp and `##[...]` marker to conceal; steps come from the API
+--- rather than the text, since a `run:` step logs its command, not its name.
 ---@param text string
 ---@param steps ci.log.Step[]
 ---@return ci.log.Row[]
@@ -192,6 +197,7 @@ end
 ---@field ts integer
 ---@field mark integer
 
+--- Renders {rows}, a chunk per tick, so a large log does not block.
 ---@param buf integer
 ---@param gen integer
 ---@param rows ci.log.Row[]

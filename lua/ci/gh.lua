@@ -1,5 +1,7 @@
 local M = {}
 
+--- Splits "owner/name", or yields gh's `{owner}`/`{repo}` placeholders. Those
+--- expand to the *base* repository, which is where a fork's checks live.
 ---@param repo? string
 ---@return string owner
 ---@return string name
@@ -142,6 +144,8 @@ query($owner:String!,$repo:String!,$expr:String!){
 ---@field workflow? string
 ---@field started_at? string
 
+--- Flattens rollup contexts, keeping the newest of each (workflow, name): a
+--- rerun leaves the superseded attempt in the rollup.
 ---@param nodes? ci.gh.RollupNode[]
 ---@return ci.Check[]
 local function to_checks(nodes)
@@ -186,6 +190,9 @@ end
 ---@field state? ci.gql.Conclusion
 ---@field checks ci.Check[]
 
+--- Resolves a git revision and its checks in one request. {expr} is evaluated
+--- by GitHub, so it sees the remote's refs rather than whatever was last
+--- fetched.
 ---@param expr string
 ---@param repo? string
 ---@param on_done fun(res?: ci.gh.Rollup, err?: string)
@@ -229,6 +236,8 @@ query($owner:String!,$repo:String!,$head:String!){
 ---@field headRepositoryOwner? { login: string }
 ---@field repo? string
 
+--- Finds the open PR for {branch}. A fork PR lives on the base repository,
+--- where the branch name may not be unique, so the viewer's own PR wins.
 ---@param branch string
 ---@param repo? string
 ---@param on_done fun(pr?: ci.gh.BranchPr, err?: string)
