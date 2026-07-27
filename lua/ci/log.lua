@@ -68,6 +68,7 @@ end
 ---@field hl? ci.Hl
 ---@field step? boolean
 ---@field conceal integer
+---@field time? string
 
 ---@param text string
 ---@param steps ci.log.Step[]
@@ -84,7 +85,15 @@ function M.parse(text, steps)
   ---@param hl? ci.Hl
   ---@param step? boolean
   local function emit(line, fold, hl, step, conceal)
-    rows[#rows + 1] = { text = line, fold = fold, hl = hl, step = step, conceal = conceal or 0 }
+    conceal = conceal or 0
+    rows[#rows + 1] = {
+      text = line,
+      fold = fold,
+      hl = hl,
+      step = step,
+      conceal = conceal,
+      time = conceal > 0 and line:sub(12, 19) or nil,
+    }
   end
 
   local function flush()
@@ -188,6 +197,7 @@ end
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
 ---@field conceal integer
+---@field time? string
 
 ---@param buf integer
 ---@param gen integer
@@ -212,6 +222,7 @@ local function paint(buf, gen, rows, done)
         hl = rows[k].hl,
         urls = urls(text),
         conceal = rows[k].conceal,
+        time = rows[k].time,
       }
     end
     i = last + 1
@@ -222,7 +233,12 @@ local function paint(buf, gen, rows, done)
     for k, m in ipairs(meta) do
       local prefix = math.min(m.conceal, #lines[k])
       if prefix > 0 then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
+        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, {
+          end_col = prefix,
+          conceal = '',
+          virt_text = m.time and { { m.time .. ' ', 'CiMuted' } } or nil,
+          virt_text_pos = 'inline',
+        })
       end
       if m.hl then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, { end_row = k, hl_group = m.hl })
