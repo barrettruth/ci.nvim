@@ -89,6 +89,8 @@ M.rank = {
   skipped = 6,
 }
 
+--- Collapses GitHub's twenty status and conclusion values. Unknown ones are
+--- pending, never passing, since the enums are open.
 ---@param status? string
 ---@param conclusion? string
 ---@return ci.Bucket
