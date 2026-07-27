@@ -21,6 +21,7 @@ local M = {}
 ---@field workflow string
 ---@field url string
 ---@field run_id integer
+---@field up? string
 ---@field checks? ci.Check[]
 
 local KINDS = { job = true, run = true, checks = true, pr = true }
@@ -106,8 +107,8 @@ end
 local MAPS = {
   { 'gX', 'web', 'Open on github.com' },
   { 'g?', 'help', 'ci.nvim mappings' },
+  { '-', 'up', 'Go up a level' },
   { '<CR>', 'open', 'Open the check under the cursor', 'list' },
-  { '-', 'up', 'Go to the parent run', 'job' },
 }
 
 ---@param buf integer
@@ -162,17 +163,12 @@ function M.enter()
 end
 
 function M.up()
-  local buf = api.nvim_get_current_buf()
-  local u = M.parse(api.nvim_buf_get_name(buf))
   ---@type ci.BufVar?
-  local b = vim.b[buf].ci
-  if not u or u.kind ~= 'job' then
-    return
+  local b = vim.b[api.nvim_get_current_buf()].ci
+  if not b or not b.up then
+    return vim.notify('[ci]: already at the top level', vim.log.levels.WARN)
   end
-  if not b or b.run_id == 0 then
-    return vim.notify('[ci]: no parent run', vim.log.levels.WARN)
-  end
-  M.open(('ci://%s/run/%d'):format(u.repo, b.run_id), { keepalt = true })
+  M.open(b.up, { keepalt = true })
 end
 
 ---@param buf integer

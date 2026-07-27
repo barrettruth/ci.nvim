@@ -185,6 +185,12 @@ function M.render(buf, gen, u)
       local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
         or ('run %d'):format(n)
       paint(buf, gen, u.repo, ('%s  %s'):format(text, label), hl, checks)
+      local sha = jobs[1] and jobs[1].head_sha
+      if sha then
+        vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
+          up = ('ci://%s/checks/%s'):format(u.repo, sha),
+        })
+      end
     end)
   end
 
