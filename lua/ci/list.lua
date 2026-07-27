@@ -183,10 +183,12 @@ function M.render(buf, gen, u)
       end
       local checks = jobs_to_checks(jobs)
       local text, hl = summarize(checks)
-      local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
-        or ('run %d'):format(n)
-      paint(buf, gen, u.repo, text, label, hl, checks)
       local sha = jobs[1] and jobs[1].head_sha
+      local head = ('%s  %s'):format(
+        sha and sha:sub(1, 8) or '',
+        (jobs[1] or {}).workflow_name or ''
+      )
+      paint(buf, gen, u.repo, text, vim.trim(head), hl, checks)
       if sha then
         vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
           up = ('ci://%s/checks/%s'):format(u.repo, sha),
