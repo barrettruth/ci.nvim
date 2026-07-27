@@ -112,7 +112,8 @@ end
 ---@param repo string
 ---@param oid string
 ---@param label? string
-local function from_rollup(buf, gen, repo, oid, label)
+---@param url? string github.com page for this view; the commit's if omitted
+local function from_rollup(buf, gen, repo, oid, label, url)
   gh.rollup(oid, repo, function(res, err)
     if not buf_util.current(buf, gen) then
       return
@@ -123,6 +124,9 @@ local function from_rollup(buf, gen, repo, oid, label)
     local text, hl = summarize(res.checks)
     local head = label and ('%s  %s'):format(res.oid:sub(1, 8), label) or res.headline or ''
     paint(buf, gen, res.repo or repo, text, vim.trim(head), hl, res.checks)
+    vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
+      url = url or ('https://github.com/%s/commit/%s/checks'):format(res.repo or repo, res.oid),
+    })
   end)
 end
 
@@ -165,7 +169,14 @@ function M.render(buf, gen, u)
       if err then
         return buf_util.fail(buf, err)
       end
-      from_rollup(buf, gen, u.repo, pr.headRefOid, pr.title)
+      from_rollup(
+        buf,
+        gen,
+        u.repo,
+        pr.headRefOid,
+        pr.title,
+        ('https://github.com/%s/pull/%d/checks'):format(u.repo, pr.number)
+      )
     end)
   end
 
@@ -187,11 +198,11 @@ function M.render(buf, gen, u)
         or ('run %d'):format(n)
       paint(buf, gen, u.repo, text, label, hl, checks)
       local sha = jobs[1] and jobs[1].head_sha
-      if sha then
-        vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
-          up = ('ci://%s/checks/%s'):format(u.repo, sha),
-        })
-      end
+      local page = ('https://github.com/%s/actions/runs/%d'):format(u.repo, n)
+      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
+        url = u.attempt and ('%s/attempts/%d'):format(page, u.attempt) or page,
+        up = sha and ('ci://%s/checks/%s'):format(u.repo, sha) or nil,
+      })
     end)
   end
 
