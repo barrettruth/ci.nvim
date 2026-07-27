@@ -18,6 +18,23 @@ local levels = {}
 ---@type table<integer, integer[]>
 local conceals = {}
 
+---@type table<string, string>
+local dates = {}
+
+--- "2026-07-27T15:14:08" -> "Mon, 27 Jul 2026 15:14:08 GMT". The weekday needs
+--- real date arithmetic, so it is resolved once per day rather than per line.
+---@param at string
+---@return string
+local function human(at)
+  local day = at:sub(1, 10)
+  local head = dates[day]
+  if not head then
+    head = tostring(os.date('%a, %d %b %Y ', vim.fn.strptime('%Y-%m-%d', day)))
+    dates[day] = head
+  end
+  return head .. at:sub(12) .. ' GMT'
+end
+
 --- Backs 'foldtext', which conceal does not apply to: without this the raw
 --- timestamp and marker leak into every closed fold.
 ---@return string
@@ -97,7 +114,7 @@ function M.parse(text, steps)
       hl = hl,
       step = step,
       conceal = conceal,
-      time = conceal > 0 and line:sub(12, 19) or nil,
+      time = conceal > 0 and human(line:sub(1, 19)) or nil,
     }
   end
 
