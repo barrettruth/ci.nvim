@@ -114,7 +114,7 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
     <CR>    <Plug>(ci-open)        In a checks list, open the check under
                                    the cursor. Checks that are not Actions
                                    jobs open in a browser.
-    -       <Plug>(ci-up)          In a job log, go to its run.
+    -       <Plug>(ci-up)          Go to the checks for this commit.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
     gS      <Plug>(ci-timestamps)  In a job log, toggle the timestamps.
     gX      <Plug>(ci-web)         Open the current buffer on github.com.
