@@ -65,14 +65,13 @@ function M.set(buf, lines)
   vim.bo[buf].modifiable = true
   api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
+  vim.bo[buf].busy = 0
 end
 
 ---@param buf integer
 ---@param err string
 function M.fail(buf, err)
-  if not vim.b[buf].ci_loaded then
-    M.set(buf, {})
-  end
+  vim.bo[buf].busy = 0
   msg(err, vim.log.levels.ERROR)
 end
 
@@ -224,7 +223,7 @@ function M.load(buf, uri)
 
   local gen = (vim.b[buf].ci_gen or 0) + 1
   vim.b[buf].ci_gen = gen
-  M.set(buf, { u.kind == 'job' and 'Loading job log...' or 'Loading checks...' })
+  vim.bo[buf].busy = 1
 
   if u.kind == 'job' then
     require('ci.log').render(buf, gen, u)
