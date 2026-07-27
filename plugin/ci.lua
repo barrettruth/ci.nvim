@@ -128,4 +128,7 @@ plug('web', 'Open on github.com', function()
   end
 end)
 plug('help', 'ci.nvim mappings', '<cmd>help ci-mappings<cr>')
+plug('timestamps', 'Toggle the timestamp column', function()
+  require('ci.log').timestamps()
+end)
 plug('refresh', 'Reload this buffer', '<cmd>edit<cr>')

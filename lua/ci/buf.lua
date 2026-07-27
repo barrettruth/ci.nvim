@@ -134,6 +134,9 @@ local function keymaps(buf, kind)
     map(buf, '-', 'up', 'Go up a level')
     map(buf, 'R', 'refresh', 'Reload this buffer')
     map(buf, 'gX', 'web', 'Open on github.com')
+    if kind == 'job' then
+      map(buf, 'gS', 'timestamps', 'Toggle the timestamp column')
+    end
     if kind == 'list' then
       map(buf, '<CR>', 'open', 'Open the check under the cursor')
     end
