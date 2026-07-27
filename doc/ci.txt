@@ -88,6 +88,14 @@ A job buffer folds two levels: step, then `##[group]`. `zM` collapses to the
 step list, with each step's conclusion. The first failing step is opened and
 the cursor placed on it.
 
+The rendered log is not byte-for-byte the raw log. Every line's ISO 8601
+timestamp is removed, `##[group]` and `##[endgroup]` markers become folds, and
+the `##[error]`, `##[warning]`, `##[notice]` and `[command]` prefixes become
+highlights. Everything else, including indentation, is left alone. For the
+untouched bytes: >
+    :term gh api repos/{owner}/{repo}/actions/jobs/{job_id}/logs
+<
+
 ==============================================================================
 MAPPINGS                                                         *ci-mappings*
 
