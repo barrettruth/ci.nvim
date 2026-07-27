@@ -120,23 +120,31 @@ end
 
 --- One line for the winbar, worst bucket first: "3 fail, 1 running, 12/16
 --- passing". Buckets with no checks are omitted.
+--- Wraps {text} in {hl} as 'statusline' markup, for the `%{%…%}` winbar form.
+---@param hl ci.Hl
+---@param text string
+---@return string
+function M.paint(hl, text)
+  return ('%%#%s#%s%%*'):format(hl, text)
+end
+
 ---@param counts table<ci.Bucket, integer>
 ---@param total integer
 ---@return string
 function M.summary(counts, total)
   if total == 0 then
-    return 'no checks'
+    return M.paint('CiPending', 'no checks')
   end
   local parts = {}
   for _, b in ipairs({ 'fail', 'attention', 'running', 'pending', 'skipped' }) do
     if (counts[b] or 0) > 0 then
-      parts[#parts + 1] = ('%d %s'):format(counts[b], b)
+      parts[#parts + 1] = M.paint(M.hl[b], ('%d %s'):format(counts[b], b))
     end
   end
   if #parts == 0 then
-    return ('%d passing'):format(total)
+    return M.paint('CiPass', ('%d passing'):format(total))
   end
-  parts[#parts + 1] = ('%d/%d passing'):format(counts.pass or 0, total)
+  parts[#parts + 1] = M.paint('CiPass', ('%d/%d passing'):format(counts.pass or 0, total))
   return table.concat(parts, ', ')
 end
 

@@ -46,8 +46,7 @@ vim.api.nvim_create_autocmd('BufWipeout', {
   end,
 })
 
-local STATUS =
-  [[%{%empty(b:ci.status) ? '' : ' | %#' .. b:ci.status_hl .. '#' .. b:ci.status .. '%*'%}]]
+local STATUS = [[%{%empty(b:ci.status) ? '' : ' | ' .. b:ci.status%}]]
 local winbar = {
   job = [[LOG %{b:ci.repo}]] .. STATUS .. [[%( %{b:ci.title}%)%( | %{b:ci.workflow}%)%<]],
   list = [[CI %{b:ci.repo}]] .. STATUS .. [[%( | %{b:ci.title}%)%<]],

@@ -17,7 +17,6 @@ local M = {}
 ---@field kind 'job'|'list'
 ---@field title string
 ---@field status string
----@field status_hl string
 ---@field repo string
 ---@field workflow string
 ---@field url string
@@ -211,7 +210,6 @@ function M.load(buf, uri)
     kind = u.kind == 'job' and 'job' or 'list',
     title = '',
     status = '',
-    status_hl = 'CiPending',
     repo = u.repo,
     workflow = '',
     url = '',
