@@ -27,6 +27,9 @@ local KINDS = { job = true, run = true, checks = true, pr = true }
 ---@type table<integer, table<integer, vim.fn.winsaveview.ret>>
 local views = {}
 
+---@type table<integer, string[]>
+local kept = {}
+
 ---@param uri string
 ---@return ci.Uri?
 function M.parse(uri)
@@ -63,12 +66,17 @@ function M.set(buf, lines)
   api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].busy = 0
+  kept[buf] = nil
 end
 
 ---@param buf integer
 ---@param err string
 function M.fail(buf, err)
   vim.bo[buf].busy = 0
+  if kept[buf] then
+    M.set(buf, kept[buf])
+    M.restore_view(buf)
+  end
   msg(err, vim.log.levels.ERROR)
 end
 
@@ -81,6 +89,7 @@ function M.save_view(buf)
     saved[win] = api.nvim_win_call(win, vim.fn.winsaveview)
   end
   views[buf] = saved
+  kept[buf] = api.nvim_buf_get_lines(buf, 0, -1, false)
 end
 
 ---@param buf integer
@@ -102,6 +111,7 @@ end
 ---@param buf integer
 function M.forget(buf)
   views[buf] = nil
+  kept[buf] = nil
   require('ci.log').forget(buf)
 end
 
