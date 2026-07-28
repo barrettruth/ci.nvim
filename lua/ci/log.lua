@@ -18,6 +18,16 @@ local levels = {}
 ---@type table<integer, integer[]>
 local conceals = {}
 
+--- How far github.com nests a line. Only a group's body is pushed in; a
+--- step's body sits flush beneath its header. A line that opens a fold
+--- belongs to its parent, so it is nested one less than what it contains.
+---@param fold ci.log.Fold
+---@return integer
+local function depth(fold)
+  local n = tonumber(fold:match('%d')) or 0
+  return math.max(0, (fold:sub(1, 1) == '>' and n - 1 or n) - 1)
+end
+
 ---@type table<string, string>
 local dates = {}
 
@@ -231,15 +241,6 @@ local function urls(text)
     out[#out + 1] = { a - 1, b, text:sub(a, b) }
     from = b + 1
   end
-end
-
---- How far github.com nests a line: a step's body sits under its header, a
---- group's body under both. A line that opens a fold belongs to its parent.
----@param fold ci.log.Fold
----@return integer
-local function depth(fold)
-  local n = tonumber(fold:match('%d')) or 0
-  return fold:sub(1, 1) == '>' and n - 1 or n
 end
 
 ---@class ci.log.Paint
