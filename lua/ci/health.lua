@@ -9,18 +9,34 @@ function M.check()
     vim.health.error('ci.nvim requires Neovim 0.13.0+')
   end
 
-  if vim.fn.executable('gh') == 0 then
-    return vim.health.error('gh not found on $PATH', {
-      'Install the GitHub CLI: https://cli.github.com',
+  local host = require('ci.forge').host()
+  vim.health.info(('origin points at %s'):format(host))
+
+  if vim.fn.executable('gh') == 1 then
+    local auth = vim.system({ 'gh', 'auth', 'status' }, { text = true }):wait()
+    if auth.code == 0 then
+      vim.health.ok('gh found and authenticated')
+    else
+      vim.health.warn('gh is not authenticated', { 'Run: gh auth login' })
+    end
+  else
+    vim.health.warn('gh not found on $PATH', {
+      'Needed for github.com: https://cli.github.com',
     })
   end
-  vim.health.ok('gh found')
 
-  local auth = vim.system({ 'gh', 'auth', 'status' }, { text = true }):wait()
-  if auth.code ~= 0 then
-    return vim.health.error('gh is not authenticated', { 'Run: gh auth login' })
+  if vim.fn.executable('tea') == 1 then
+    local ver = vim.system({ 'tea', 'api', 'version' }, { text = true }):wait()
+    if ver.code == 0 then
+      vim.health.ok('tea found and authenticated')
+    else
+      vim.health.warn('tea is not authenticated', { 'Run: tea login add' })
+    end
+  else
+    vim.health.warn('tea not found on $PATH', {
+      'Needed for Forgejo: https://gitea.com/gitea/tea',
+    })
   end
-  vim.health.ok('gh is authenticated')
 end
 
 return M

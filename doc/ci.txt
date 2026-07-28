@@ -5,15 +5,19 @@ Author:  Barrett Ruth <br@barrettruth.com> License: GPL-3.0
 ==============================================================================
 INTRODUCTION                                                    *ci* *ci.nvim*
 
-GitHub Actions status and logs for whatever you are working on. One command,
-|:CI|, and no configuration.
+GitHub Actions and Forgejo Actions status and logs for whatever you are
+working on. One command, |:CI|, and no configuration.
 
 ==============================================================================
 REQUIREMENTS                                                 *ci-requirements*
 
 - Neovim 0.13+
-- The GitHub CLI, `gh`, authenticated (`gh auth login`)
 - `git`
+- `gh`, authenticated (`gh auth login`), for github.com
+- `tea`, authenticated (`tea login add`), for Forgejo 16+
+
+The forge is chosen from the host of the `upstream` remote, else `origin`:
+github.com uses `gh`, anything else uses `tea`.
 
 ==============================================================================
 INSTALL                                                           *ci-install*
@@ -44,7 +48,7 @@ COMMAND                                                          *ci-commands*
                         branch. Use |:CI| with no args for your working
                         state.
 
-:CI {url}               Show a github.com URL. Recognised:
+:CI {url}               Show a forge URL. Recognised on github.com:
                           .../actions/runs/{run}/job/{job}    a job log
                           .../actions/runs/{run}              a run
                           .../actions/runs/{run}/attempts/{n} one attempt
@@ -55,6 +59,13 @@ COMMAND                                                          *ci-commands*
                           .../actions                         the repository
                         A `#step:{n}:{line}` fragment is accepted and ignored.
 
+                        On Forgejo:
+                          .../actions/runs/{run}              a run
+                          .../actions/runs/{run}/jobs/{n}     a run
+                          .../pulls/{n}                       a pull request
+                          .../commit/{sha}                    a commit
+                          .../actions                         the repository
+
 :CI ci://...            Reopen a ci.nvim buffer by name. See |ci-buffers|.
 
 :CI .                   Use the |<cWORD>| under the cursor as the argument.
@@ -62,19 +73,20 @@ COMMAND                                                          *ci-commands*
 Window modifiers split rather than replace: `:vertical CI`, `:tab CI`,
 `:botright CI`. `:pedit ci://...` works too.
 
-Repository resolution is delegated entirely to `gh`, which means fork pull
-requests resolve to the base repository (where checks usually live). If `gh`
-picks the wrong repository, fix it with `gh repo set-default`.
+Repository resolution is delegated entirely to the CLI. For `gh` that means
+fork pull requests resolve to the base repository (where checks usually live);
+if it picks the wrong one, fix it with `gh repo set-default`. `tea` has no
+equivalent, so on Forgejo a fork is queried as itself.
 
 ==============================================================================
 BUFFERS                                                           *ci-buffers*
 
 Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
 >
-    ci://{owner}/{repo}/job/{job_id}
-    ci://{owner}/{repo}/run/{run_id}[/{attempt}]
-    ci://{owner}/{repo}/pr/{number}
-    ci://{owner}/{repo}/checks/{oid}
+    ci://{host}/{owner}/{repo}/job/{job_id}
+    ci://{host}/{owner}/{repo}/run/{run_id}[/{attempt}]
+    ci://{host}/{owner}/{repo}/pr/{number}
+    ci://{host}/{owner}/{repo}/checks/{oid}
 <
 A buffer with anything still running reloads itself every ten seconds and
 stops once the checks settle, or once no window is showing it. `:e` and `R`
@@ -82,7 +94,8 @@ refresh on demand; either way the cursor and scroll position are kept.
 Re-running |:CI| for a buffer that is already open just moves to its window
 without refetching.
 
-A job buffer folds two levels by default: step, then `##[group]`. The first
+A job buffer folds two levels by default: step, then `##[group]`. Forgejo does
+not expose step boundaries, so its logs fold on `##[group]` alone. The first
 failing step is opened and the cursor placed on it. Interact with the folds as
 you would regularly; `zM`/`zR` collapses/expands the step list. For example,
 to disable all folds always: >lua
@@ -123,9 +136,11 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
     -       <Plug>(ci-up)          Go back to the list you came from.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
     ]]      <Plug>(ci-next-step)   In a job log, go to the next step.
+                                   Unmapped on Forgejo, which has no steps.
     [[      <Plug>(ci-prev-step)   In a job log, go to the previous step.
+                                   Unmapped on Forgejo, which has no steps.
     gS      <Plug>(ci-timestamps)  In a job log, toggle the timestamps.
-    gX      <Plug>(ci-web)         Open the current buffer on github.com.
+    gX      <Plug>(ci-web)         Open the current buffer in a browser.
     g?      <Plug>(ci-help)        This section.
 
 To rebind, map the |<Plug>| target and the default is skipped: >lua
@@ -151,25 +166,45 @@ Log colours are derived from the ANSI escapes in the log itself and follow
 your terminal palette (`g:terminal_color_0` through `g:terminal_color_15`).
 
 `CiFailBand` and `CiAttentionBand` fill the line behind an `##[error]` or
-`##[warning]`. Their color is `Normal`'s background moved a fifth of the way
-toward `CiFail` or `CiAttention`, recomputed on |ColorScheme|. Without
-'termguicolors', or where either colour is unset, there is no fill and the
-line keeps its foreground tint.
+`##[warning]`, and behind Forgejo's `::error::` and `::warning::` spellings.
+Their color is `Normal`'s background moved a fifth of the way toward `CiFail`
+or `CiAttention`, recomputed on |ColorScheme|. Without 'termguicolors', or
+where either colour is unset, there is no fill and the line keeps its
+foreground tint.
 
 ==============================================================================
 HEALTH                                                             *ci-health*
 
-Checks the Neovim version, `gh`, and its authentication: >
+Checks the Neovim version, the `origin` host, and both CLIs: >
     :checkhealth ci
 <
 ==============================================================================
 LIMITATIONS                                                   *ci-limitations*
 
-Running jobs do not display logs (limitation of GitHub). `gh` has tracked the
-same limitation since 2021: >
+On GitHub, running jobs do not display logs. `gh` has tracked the same
+limitation since 2021: >
     https://github.com/cli/cli/issues/3484
 <
 Until then a running job shows its steps. Once finished the job automatically
 refreshes to display the newly available logs.
+
+Forgejo does not expose per-step boundaries for a job, in its API, its log
+text, or its run archive. The boundaries exist in its database, but only its
+web interface can reach them. Step folds, step headers, and `[[`/`]]` are
+therefore GitHub-only.
+
+Forgejo has no server-side revision parsing, so `:CI {rev}` is resolved with
+local `git rev-parse` and sees only what you have fetched.
+
+Forgejo has no single-job endpoint. A job opened from a pasted URL shows its
+log with no name or status; opened from a list it inherits both.
+
+A Forgejo job id is stable across reruns and always answers with the newest
+attempt, where GitHub mints a new id per attempt and a URL pins one. Earlier
+attempts are not reachable.
+
+A Forgejo run URL names the run by its index within the repository, not by the
+id its API answers to. The two are matched by searching recent runs, so a link
+to a long-past run reports rather than resolves.
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

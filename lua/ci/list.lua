@@ -1,6 +1,6 @@
 local ansi = require('ci.ansi')
 local buf_util = require('ci.buf')
-local gh = require('ci.gh')
+local forge = require('ci.forge')
 local status = require('ci.status')
 
 local api = vim.api
@@ -100,9 +100,10 @@ end
 ---@param repo string
 ---@param oid string
 ---@param label? string
----@param url? string github.com page for this view; the commit's if omitted
-local function from_rollup(buf, gen, repo, oid, label, url)
-  gh.rollup(oid, repo, function(res, err)
+---@param host string
+---@param url? string forge page for this view; the commit's if omitted
+local function from_rollup(buf, gen, repo, oid, label, url, host)
+  forge.of(host).rollup(oid, repo, function(res, err)
     if not buf_util.current(buf, gen) then
       return
     end
@@ -113,22 +114,23 @@ local function from_rollup(buf, gen, repo, oid, label, url)
     local head = label and ('%s  %s'):format(res.oid:sub(1, 8), label) or res.headline or ''
     paint(buf, gen, res.repo or repo, text, vim.trim(head), res.checks)
     vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
-      url = url or ('https://github.com/%s/commit/%s/checks'):format(res.repo or repo, res.oid),
+      url = url or forge.web(host, res.repo or repo, 'checks', res.oid),
     })
   end)
 end
 
 ---@param jobs ci.gh.Job[]
+---@param page? string the run's browser page, where jobs are named by position
 ---@return ci.Check[]
-local function jobs_to_checks(jobs)
+local function jobs_to_checks(jobs, page)
   ---@type ci.Check[]
   local out = {}
-  for _, j in ipairs(jobs) do
+  for i, j in ipairs(jobs) do
     out[#out + 1] = {
       name = j.name,
       status = j.status,
       conclusion = j.conclusion,
-      url = j.html_url,
+      url = j.html_url or require('ci.tea').job_page(page, i - 1, j.attempt),
       job_id = j.id,
       run_id = j.run_id,
       workflow = j.workflow_name,
@@ -142,7 +144,7 @@ end
 ---@param u ci.Uri
 function M.render(buf, gen, u)
   if u.kind == 'checks' then
-    return from_rollup(buf, gen, u.repo, u.id)
+    return from_rollup(buf, gen, u.repo, u.id, nil, nil, u.host)
   end
 
   if u.kind == 'pr' then
@@ -150,7 +152,7 @@ function M.render(buf, gen, u)
     if not n then
       return buf_util.fail(buf, ('malformed PR number: %s'):format(u.id))
     end
-    return gh.pr_by_number(n, u.repo, function(pr, err)
+    return forge.of(u.host).pr_by_number(n, u.repo, function(pr, err)
       if not buf_util.current(buf, gen) then
         return
       end
@@ -163,7 +165,8 @@ function M.render(buf, gen, u)
         u.repo,
         pr.headRefOid,
         pr.title,
-        ('https://github.com/%s/pull/%d/checks'):format(u.repo, pr.number)
+        forge.web(u.host, u.repo, 'pr', pr.number),
+        u.host
       )
     end)
   end
@@ -173,25 +176,35 @@ function M.render(buf, gen, u)
     if not n then
       return buf_util.fail(buf, ('malformed run id: %s'):format(u.id))
     end
-    return gh.run_jobs(n, u.attempt, u.repo, function(jobs, err)
-      if not buf_util.current(buf, gen) then
-        return
-      end
-      if err then
-        return buf_util.fail(buf, err)
-      end
-      local checks = jobs_to_checks(jobs)
-      local text = summarize(checks)
-      local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
-        or ('run %d'):format(n)
-      paint(buf, gen, u.repo, text, label, checks)
-      local sha = jobs[1] and jobs[1].head_sha
-      local page = ('https://github.com/%s/actions/runs/%d'):format(u.repo, n)
-      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
-        url = u.attempt and ('%s/attempts/%d'):format(page, u.attempt) or page,
-        up = sha and ('ci://%s/checks/%s'):format(u.repo, sha) or nil,
-      })
-    end)
+    local be = forge.of(u.host)
+    -- Forgejo keys its run page on a different id than its API, and its job
+    -- pages hang off that page, so it is fetched before the jobs are drawn.
+    local function draw(page)
+      be.run_jobs(n, u.attempt, u.repo, function(jobs, err)
+        if not buf_util.current(buf, gen) then
+          return
+        end
+        if err then
+          return buf_util.fail(buf, err)
+        end
+        local checks = jobs_to_checks(jobs, page)
+        local text = summarize(checks)
+        local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
+          or ('run %d'):format(n)
+        paint(buf, gen, u.repo, text, label, checks)
+        local sha = jobs[1] and jobs[1].head_sha
+        vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
+          url = page or forge.web(u.host, u.repo, 'run', n, u.attempt),
+          up = sha and ('ci://%s/%s/checks/%s'):format(u.host, u.repo, sha) or nil,
+        })
+      end)
+    end
+    if be.run then
+      return be.run(n, u.repo, function(r)
+        draw(r and r.html_url or nil)
+      end)
+    end
+    return draw(nil)
   end
 
   buf_util.fail(buf, ('unknown ci:// kind: %s'):format(u.kind))

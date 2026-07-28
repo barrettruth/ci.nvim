@@ -7,7 +7,8 @@ local M = {}
 
 ---@alias ci.gql.Status 'REQUESTED'|'QUEUED'|'IN_PROGRESS'|'COMPLETED'|'WAITING'|'PENDING'
 ---@alias ci.rest.Status 'requested'|'queued'|'in_progress'|'completed'|'waiting'|'pending'
----@alias ci.Status ci.gql.Status|ci.rest.Status
+---@alias ci.forgejo.Status 'unknown'|'success'|'failure'|'cancelled'|'skipped'|'waiting'|'running'|'blocked'
+---@alias ci.Status ci.gql.Status|ci.rest.Status|ci.forgejo.Status
 
 ---@alias ci.gql.Conclusion
 ---| 'SUCCESS'
@@ -44,14 +45,18 @@ local BUCKET = {
   error = 'fail',
 
   action_required = 'attention',
+  warning = 'attention',
 
   in_progress = 'running',
+  running = 'running',
 
   queued = 'pending',
   requested = 'pending',
   waiting = 'pending',
   pending = 'pending',
   expected = 'pending',
+  blocked = 'pending',
+  unknown = 'pending',
 
   skipped = 'skipped',
   neutral = 'skipped',
