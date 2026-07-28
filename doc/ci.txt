@@ -76,9 +76,11 @@ Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
     ci://{owner}/{repo}/pr/{number}
     ci://{owner}/{repo}/checks/{oid}
 <
-There is no polling. Press `:e` or `R` to refresh; the cursor and scroll
-position are kept. Re-running |:CI| for a buffer that is already open just
-moves to its window without refetching.
+A buffer with anything still running reloads itself every ten seconds and
+stops once the checks settle, or once no window is showing it. `:e` and `R`
+refresh on demand; either way the cursor and scroll position are kept.
+Re-running |:CI| for a buffer that is already open just moves to its window
+without refetching.
 
 A job buffer folds two levels by default: step, then `##[group]`. The first
 failing step is opened and the cursor placed on it. Interact with the folds as
