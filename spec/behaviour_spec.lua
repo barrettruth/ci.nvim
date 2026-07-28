@@ -78,7 +78,7 @@ end)
 
 describe('a job log', function()
   it('keeps the log verbatim and adds only step headers', function()
-    local b = open('ci://o/r/job/22')
+    local b = open('ci://github.com/o/r/job/22')
     local lines = vim.api.nvim_buf_get_lines(b, 0, -1, false)
     assert.same('2026-07-27T15:14:08.0000000Z ✓ Setup', lines[1])
     assert.same('2026-07-27T15:14:09.0000000Z hello', lines[3])
@@ -87,13 +87,13 @@ describe('a job log', function()
   end)
 
   it('never writes chrome into the buffer', function()
-    assert.is_nil(text(open('ci://o/r/job/22')):find('Loading'))
+    assert.is_nil(text(open('ci://github.com/o/r/job/22')):find('Loading'))
     stub({
       log = function(cb)
         cb(nil, 'gh: Not Found (HTTP 404)')
       end,
     })
-    assert.same('', text(open('ci://o/r/job/99')))
+    assert.same('', text(open('ci://github.com/o/r/job/99')))
   end)
 
   it('keeps a skipped job navigable when its log is gone', function()
@@ -103,14 +103,14 @@ describe('a job log', function()
         cb(nil, 'gh: Not Found (HTTP 404)')
       end,
     })
-    local b = open('ci://o/r/job/22')
-    assert.same('ci://o/r/checks/abc1234def', vim.b[b].ci.up)
+    local b = open('ci://github.com/o/r/job/22')
+    assert.same('ci://github.com/o/r/checks/abc1234def', vim.b[b].ci.up)
     assert.same(JOB.html_url, vim.b[b].ci.url)
     assert.same('build', vim.b[b].ci.title)
   end)
 
   it('leaves what you were reading when a refresh fails', function()
-    local b = open('ci://o/r/job/22')
+    local b = open('ci://github.com/o/r/job/22')
     local before = text(b)
     stub({
       log = function(cb)
@@ -132,7 +132,7 @@ describe('the timestamp column', function()
   end
 
   it('toggles, and survives a reload without going stale', function()
-    local b = open('ci://o/r/job/22')
+    local b = open('ci://github.com/o/r/job/22')
     assert.same(0, marks(b))
 
     require('ci.log').timestamps()
@@ -154,7 +154,7 @@ end)
 describe('step motions', function()
   it('skip groups, which no fold motion does', function()
     local log = require('ci.log')
-    local b = open('ci://o/r/job/22')
+    local b = open('ci://github.com/o/r/job/22')
     -- line 1 is the step header, line 2 the ##[group] that zj would stop on
     assert.same(
       '2026-07-27T15:14:08.0000000Z ✓ Setup',
@@ -170,7 +170,7 @@ end)
 
 describe('navigation', function()
   it('sends you back to the list you came from', function()
-    for _, from in ipairs({ 'ci://o/r/checks/abc1234def', 'ci://o/r/pr/7' }) do
+    for _, from in ipairs({ 'ci://github.com/o/r/checks/abc1234def', 'ci://github.com/o/r/pr/7' }) do
       gh.pr_by_number = function(_, _, cb)
         vim.schedule(function()
           cb({ number = 7, title = 'a pull request', headRefOid = 'abc1234def' })
@@ -182,15 +182,15 @@ describe('navigation', function()
       vim.wait(2000, function()
         return vim.bo[vim.api.nvim_get_current_buf()].busy == 0
       end)
-      assert.same('ci://o/r/job/22', vim.api.nvim_buf_get_name(0))
+      assert.same('ci://github.com/o/r/job/22', vim.api.nvim_buf_get_name(0))
       buf.up()
       assert.same(from, vim.api.nvim_buf_get_name(0))
     end
   end)
 
   it('falls back to the commit for a job opened by URL', function()
-    open('ci://o/r/job/22')
+    open('ci://github.com/o/r/job/22')
     buf.up()
-    assert.same('ci://o/r/checks/abc1234def', vim.api.nvim_buf_get_name(0))
+    assert.same('ci://github.com/o/r/checks/abc1234def', vim.api.nvim_buf_get_name(0))
   end)
 end)

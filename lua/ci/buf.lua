@@ -8,6 +8,7 @@ local M = {}
 ---@alias ci.Uri.Kind 'job'|'run'|'checks'|'pr'
 
 ---@class ci.Uri
+---@field host string
 ---@field repo string
 ---@field kind ci.Uri.Kind
 ---@field id string
@@ -131,12 +132,13 @@ function M.parse(uri)
   if not body then
     return nil
   end
-  local owner, name, kind, rest = body:match('^([^/]+)/([^/]+)/([^/]+)/(.+)$')
+  local host, owner, name, kind, rest = body:match('^([^/]+)/([^/]+)/([^/]+)/([^/]+)/(.+)$')
   if not owner or not KINDS[kind] then
     return nil
   end
   local id, attempt = rest:match('^(%d+)/(%d+)$')
   return {
+    host = host,
     repo = owner .. '/' .. name,
     kind = kind,
     id = id or rest,
@@ -240,15 +242,18 @@ end
 
 ---@param buf integer
 ---@param kind 'job'|'list'
-local function keymaps(buf, kind)
+---@param steps boolean whether the forge exposes step boundaries
+local function keymaps(buf, kind, steps)
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
     map(buf, '-', 'up', 'Go back to the list you came from')
     map(buf, 'R', 'refresh', 'Reload this buffer')
-    map(buf, 'gX', 'web', 'Open on github.com')
+    map(buf, 'gX', 'web', 'Open in the browser')
     if kind == 'job' then
-      map(buf, ']]', 'next-step', 'Go to the next step')
-      map(buf, '[[', 'prev-step', 'Go to the previous step')
+      if steps then
+        map(buf, ']]', 'next-step', 'Go to the next step')
+        map(buf, '[[', 'prev-step', 'Go to the previous step')
+      end
       map(buf, 'gS', 'timestamps', 'Toggle the timestamp column')
     end
     if kind == 'list' then
@@ -290,9 +295,19 @@ function M.enter()
   end
   if check.job_id then
     local from = api.nvim_buf_get_name(buf)
-    M.open(('ci://%s/job/%d'):format(u.repo, check.job_id), { keepalt = true })
+    M.open(('ci://%s/%s/job/%d'):format(u.host, u.repo, check.job_id), { keepalt = true })
+    -- Forgejo serves a job's log but not the job, so what the list already
+    -- knows about the check is handed down rather than refetched.
     local job = api.nvim_get_current_buf()
-    vim.b[job].ci = vim.tbl_extend('force', vim.b[job].ci, { up = from })
+    local st = require('ci.status')
+    local sym, hl = st.of(check.status, check.conclusion)
+    vim.b[job].ci = vim.tbl_extend('force', vim.b[job].ci, {
+      up = from,
+      title = check.name or '',
+      status = st.paint(hl, sym),
+      workflow = check.workflow or '',
+      url = check.url or '',
+    })
     return
   end
   if check.url then
@@ -338,7 +353,7 @@ function M.load(buf, uri)
     url = '',
   }
 
-  keymaps(buf, u.kind == 'job' and 'job' or 'list')
+  keymaps(buf, u.kind == 'job' and 'job' or 'list', require('ci.forge').is_github(u.host))
   api.nvim_buf_clear_namespace(buf, ansi.ns, 0, -1)
 
   local gen = (vim.b[buf].ci_gen or 0) + 1

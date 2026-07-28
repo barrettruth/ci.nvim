@@ -296,16 +296,17 @@ end
 ---@class ci.gh.JobStep
 ---@field name string
 ---@field number integer
----@field status ci.rest.Status
+---@field status? ci.rest.Status
 ---@field conclusion? ci.rest.Conclusion
 ---@field started_at? string
 
 ---@class ci.gh.Job
 ---@field id integer
 ---@field run_id integer
+---@field attempt? integer
 ---@field head_sha? string
 ---@field name string
----@field status ci.rest.Status
+---@field status? ci.rest.Status
 ---@field conclusion? ci.rest.Conclusion
 ---@field html_url? string
 ---@field workflow_name? string

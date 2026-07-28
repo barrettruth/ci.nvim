@@ -1,6 +1,6 @@
 local ansi = require('ci.ansi')
 local buf_util = require('ci.buf')
-local gh = require('ci.gh')
+local forge = require('ci.forge')
 local status = require('ci.status')
 
 local api = vim.api
@@ -94,6 +94,29 @@ end
 ---@field at string
 ---@field number integer
 
+--- Forgejo leaves `::error::` and `::warning file=,line=::` literal where
+--- GitHub's runner rewrites them to `##[error]`.
+---@param body string
+---@param name string
+---@return string? text
+function M.marker(body, name)
+  return body:match('^##%[' .. name .. '%](.*)$')
+    or body:match('^::' .. name .. '::(.*)$')
+    or body:match('^::' .. name .. ' [^:]*::(.*)$')
+end
+
+--- Prefers {a}, falling back to what the buffer already had. A Forgejo job
+--- arrives with most fields empty, and the list it was opened from knew them.
+---@param a? string
+---@param b? string
+---@return string
+local function kept(a, b)
+  if a ~= nil and a ~= '' then
+    return a
+  end
+  return b or ''
+end
+
 ---@param steps? ci.gh.JobStep[]
 ---@return ci.log.Step[]
 local function usable_steps(steps)
@@ -186,11 +209,11 @@ function M.parse(text, steps)
       end
     end
 
-    local group = body:match('^##%[group%](.*)$')
-    local endgroup = body:match('^##%[endgroup%]')
-    local err = body:match('^##%[error%](.*)$')
-    local warn = body:match('^##%[warning%](.*)$')
-    local notice = body:match('^##%[notice%](.*)$')
+    local group = M.marker(body, 'group')
+    local endgroup = body:match('^##%[endgroup%]') or body:match('^::endgroup::')
+    local err = M.marker(body, 'error')
+    local warn = M.marker(body, 'warning')
+    local notice = M.marker(body, 'notice')
     local command = body:match('^%[command%](.*)$')
 
     if not endgroup then
@@ -434,6 +457,13 @@ function M.render(buf, gen, u)
     for i, r in ipairs(rows) do
       stamps[buf][i] = r.time
     end
+    -- A forge that serves a running job's log has to say when it stopped
+    -- growing; GitHub never gets here until the job is over.
+    local be = forge.of(u.host)
+    if be.finished and not be.finished(text) then
+      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true })
+      buf_util.watch(buf)
+    end
     paint(buf, gen, rows, function()
       vim.b[buf].ci_loaded = true
       times(buf, showing or false)
@@ -475,21 +505,23 @@ function M.render(buf, gen, u)
     buf_util.fail(buf, err)
   end
 
-  gh.job(id, u.repo, function(data, err)
+  forge.of(u.host).job(id, u.repo, function(data, err)
     if err then
       return fail(err)
     end
     job = data
     if buf_util.current(buf, gen) then
+      local prev = vim.b[buf].ci or {}
       local sym, hl = status.of(job.status, job.conclusion)
       ---@type ci.BufVar
-      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
-        title = job.name or '',
-        status = status.paint(hl, sym),
-        workflow = job.workflow_name or '',
-        url = job.html_url or '',
+      vim.b[buf].ci = vim.tbl_extend('force', prev, {
+        title = kept(job.name, prev.title),
+        status = (job.status ~= nil and job.status ~= '') and status.paint(hl, sym)
+          or kept(prev.status, status.paint(hl, sym)),
+        workflow = kept(job.workflow_name, prev.workflow),
+        url = kept(job.html_url, prev.url),
         up = vim.b[buf].ci.up
-          or (job.head_sha and ('ci://%s/checks/%s'):format(u.repo, job.head_sha) or nil),
+          or (job.head_sha and ('ci://%s/%s/checks/%s'):format(u.host, u.repo, job.head_sha) or nil),
       })
     end
     if log_err then
@@ -497,7 +529,7 @@ function M.render(buf, gen, u)
     end
     ready()
   end)
-  gh.job_log(id, u.repo, function(out, err)
+  forge.of(u.host).job_log(id, u.repo, function(out, err)
     if err then
       log_err = err
       if job then

@@ -159,7 +159,7 @@ vim.api.nvim_create_user_command('CI', function(args)
 end, {
   nargs = '?',
   bar = true,
-  desc = 'GitHub Actions CI',
+  desc = 'Actions CI',
   complete = complete,
 })
 
@@ -176,7 +176,7 @@ end)
 plug('up', 'Go back to the list you came from', function()
   require('ci.buf').up()
 end)
-plug('web', 'Open on github.com', function()
+plug('web', 'Open in the browser', function()
   local url = require('ci').url(0)
   if url then
     vim.ui.open(url)
