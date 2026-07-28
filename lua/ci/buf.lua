@@ -127,7 +127,7 @@ end
 local function keymaps(buf, kind)
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
-    map(buf, '-', 'up', 'Go up a level')
+    map(buf, '-', 'up', 'Go back to the list you came from')
     map(buf, 'R', 'refresh', 'Reload this buffer')
     map(buf, 'gX', 'web', 'Open on github.com')
     if kind == 'job' then
