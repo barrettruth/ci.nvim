@@ -141,6 +141,8 @@ local function keymaps(buf, kind)
     map(buf, 'R', 'refresh', 'Reload this buffer')
     map(buf, 'gX', 'web', 'Open on github.com')
     if kind == 'job' then
+      map(buf, ']]', 'next-step', 'Go to the next step')
+      map(buf, '[[', 'prev-step', 'Go to the previous step')
       map(buf, 'gS', 'timestamps', 'Toggle the timestamp column')
     end
     if kind == 'list' then

@@ -151,6 +151,23 @@ describe('the timestamp column', function()
   end)
 end)
 
+describe('step motions', function()
+  it('skip groups, which no fold motion does', function()
+    local log = require('ci.log')
+    local b = open('ci://o/r/job/22')
+    -- line 1 is the step header, line 2 the ##[group] that zj would stop on
+    assert.same(
+      '2026-07-27T15:14:08.0000000Z ✓ Setup',
+      vim.api.nvim_buf_get_lines(b, 0, 1, false)[1]
+    )
+    vim.api.nvim_win_set_cursor(0, { 4, 0 })
+    log.step(-1)
+    assert.same(1, vim.api.nvim_win_get_cursor(0)[1])
+    log.step(-1)
+    assert.same(1, vim.api.nvim_win_get_cursor(0)[1])
+  end)
+end)
+
 describe('navigation', function()
   it('sends you back to the list you came from', function()
     for _, from in ipairs({ 'ci://o/r/checks/abc1234def', 'ci://o/r/pr/7' }) do

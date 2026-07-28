@@ -405,6 +405,34 @@ end
 
 --- Shows or hides the timestamp column. Its own namespace, so flipping it
 --- leaves the ANSI highlights and the concealed prefix untouched.
+--- Moves {count} steps. No fold motion does this: zj stops at every fold
+--- start and a group is a fold too, so the level has to be read directly.
+---@param dir -1|1
+function M.step(dir)
+  local fold = levels[api.nvim_get_current_buf()]
+  if not fold then
+    return
+  end
+  local from = api.nvim_win_get_cursor(0)[1]
+  local at = from
+  for _ = 1, vim.v.count1 do
+    local n = at + dir
+    while n >= 1 and n <= #fold and fold[n] ~= '>1' do
+      n = n + dir
+    end
+    if n < 1 or n > #fold then
+      break
+    end
+    at = n
+  end
+  if at == from then
+    return
+  end
+  vim.cmd("normal! m'")
+  api.nvim_win_set_cursor(0, { at, 0 })
+  vim.cmd('normal! zv')
+end
+
 function M.timestamps()
   local buf = api.nvim_get_current_buf()
   if stamps[buf] then

@@ -118,6 +118,8 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
                                    jobs open in a browser.
     -       <Plug>(ci-up)          Go back to the list you came from.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
+    ]]      <Plug>(ci-next-step)   In a job log, go to the next step.
+    [[      <Plug>(ci-prev-step)   In a job log, go to the previous step.
     gS      <Plug>(ci-timestamps)  In a job log, toggle the timestamps.
     gX      <Plug>(ci-web)         Open the current buffer on github.com.
     g?      <Plug>(ci-help)        This section.
