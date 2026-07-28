@@ -52,9 +52,9 @@ luarocks install ci.nvim
 :CI .
 ```
 
-Inside a `ci://` buffer: `<CR>` opens the check under the cursor, `-` goes from
-a job back to its run, `gX` opens the checks on the remote, and `g?` shows the mappings.
-Refresh buffers with `:e`/`R`.
+Work with a `ci://` buffer via neovim-native mappings. `<CR>` opens the check
+under the cursor, `-` goes back to the list you came from, walk job steps with
+`[[` and `]]`, and more.
 
 ## Documentation
 
