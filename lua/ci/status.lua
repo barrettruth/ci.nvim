@@ -3,7 +3,7 @@ local M = {}
 ---@alias ci.Bucket 'fail'|'attention'|'running'|'pending'|'pass'|'skipped'
 
 ---@alias ci.Hl.Bucket 'CiPass'|'CiFail'|'CiRunning'|'CiPending'|'CiSkipped'|'CiAttention'
----@alias ci.Hl ci.Hl.Bucket|'CiGroup'|'CiCommand'|'CiUrl'|'CiMuted'
+---@alias ci.Hl ci.Hl.Bucket|'CiGroup'|'CiCommand'|'CiDebug'|'CiUrl'|'CiMuted'
 
 ---@alias ci.gql.Status 'REQUESTED'|'QUEUED'|'IN_PROGRESS'|'COMPLETED'|'WAITING'|'PENDING'
 ---@alias ci.rest.Status 'requested'|'queued'|'in_progress'|'completed'|'waiting'|'pending'

@@ -214,6 +214,7 @@ function M.parse(text, steps)
     local err = M.marker(body, 'error')
     local warn = M.marker(body, 'warning')
     local notice = M.marker(body, 'notice')
+    local debug = M.marker(body, 'debug')
     local command = body:match('^%[command%](.*)$')
 
     if not endgroup then
@@ -246,6 +247,11 @@ function M.parse(text, steps)
       emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn, 'Warning: ')
     elseif notice then
       emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice, 'Notice: ')
+    elseif debug then
+      -- The marker stays. Every other one is concealed because a word takes
+      -- its place; this one would leave nothing behind, and a colour alone
+      -- cannot be relied on to say which lines were debugging output.
+      emit(raw, in_group and '2' or '1', 'CiDebug', nil, ts)
     elseif command then
       emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
     elseif body ~= '' or #rows > 0 then
