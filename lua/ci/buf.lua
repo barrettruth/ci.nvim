@@ -268,15 +268,6 @@ function M.enter()
   end
   if check.job_id then
     local from = api.nvim_buf_get_name(buf)
-    local bucket = require('ci.status').bucket(check.status, check.conclusion)
-    if (bucket == 'running' or bucket == 'pending') and check.run_id then
-      -- No log exists yet and none will stream, so hand the wait to `gh`.
-      vim.cmd(('terminal gh run watch --repo %s %d --interval 10'):format(u.repo, check.run_id))
-      local term = api.nvim_get_current_buf()
-      vim.b[term].ci = { up = from }
-      map(term, '-', 'up', 'Go back to the list you came from')
-      return
-    end
     M.open(('ci://%s/job/%d'):format(u.repo, check.job_id), { keepalt = true })
     local job = api.nvim_get_current_buf()
     vim.b[job].ci = vim.tbl_extend('force', vim.b[job].ci, { up = from })

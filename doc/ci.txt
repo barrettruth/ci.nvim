@@ -168,8 +168,7 @@ Running jobs do not display logs (limitation of GitHub). `gh` has tracked the
 same limitation since 2021: >
     https://github.com/cli/cli/issues/3484
 <
-Instead, ci.nvim makes `<CR>` on a running check shell off to `gh run watch`,
-which reports aggregate step status instead of actual output. Once it ends,
-press `-` and then |<CR>| to open the log.
+Until then a running job shows its steps, refreshed on the same ten-second
+poll as a list, and becomes the log once it finishes.
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

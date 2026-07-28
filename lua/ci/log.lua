@@ -376,6 +376,35 @@ local function no_log(err, job)
   return err
 end
 
+--- All a job can show before its log exists. The steps come back with the
+--- job itself, so this costs nothing beyond what was already fetched, and
+--- the poll that keeps a list current keeps this current too.
+---@param buf integer
+---@param job ci.gh.Job
+local function steplist(buf, job)
+  local lines, marks, checks = {}, {}, {}
+  for i, s in ipairs(job.steps or {}) do
+    local sym, hl = status.of(s.status, s.conclusion)
+    lines[i] = ('%s %s'):format(sym, s.name)
+    marks[i] = hl
+    checks[i] = { name = s.name, status = s.status, conclusion = s.conclusion }
+  end
+  buf_util.set(buf, lines)
+  for i, hl in ipairs(marks) do
+    api.nvim_buf_set_extmark(
+      buf,
+      ansi.ns,
+      i - 1,
+      0,
+      { end_col = #tostring(lines[i]), hl_group = hl }
+    )
+  end
+  ---@diagnostic disable-next-line: assign-type-mismatch
+  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { checks = checks })
+  vim.b[buf].ci_loaded = true
+  buf_util.watch(buf)
+end
+
 ---@param buf integer
 ---@param gen integer
 ---@param u ci.Uri
@@ -424,6 +453,20 @@ function M.render(buf, gen, u)
     end)
   end
 
+  --- A running job has no log yet, so show how far it has got instead.
+  ---@param j ci.gh.Job
+  ---@param err string
+  local function settle(j, err)
+    if failed or not buf_util.current(buf, gen) then
+      return
+    end
+    failed = true
+    if j.status ~= 'completed' then
+      return steplist(buf, j)
+    end
+    buf_util.fail(buf, no_log(err, j))
+  end
+
   local function fail(err)
     if failed or not buf_util.current(buf, gen) then
       return
@@ -450,7 +493,7 @@ function M.render(buf, gen, u)
       })
     end
     if log_err then
-      return fail(no_log(log_err, job))
+      return settle(job, log_err)
     end
     ready()
   end)
@@ -458,7 +501,7 @@ function M.render(buf, gen, u)
     if err then
       log_err = err
       if job then
-        fail(no_log(err, job))
+        settle(job, err)
       end
       return
     end
