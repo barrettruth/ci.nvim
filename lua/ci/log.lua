@@ -305,7 +305,7 @@ end
 ---@param buf integer
 ---@param gen integer
 ---@param rows ci.log.Row[]
----@param done fun()
+---@param done fun(following: table<integer, boolean>)
 local function paint(buf, gen, rows, done)
   ---@type integer, ci.ansi.State
   local i, st = 1, {}
@@ -336,8 +336,30 @@ local function paint(buf, gen, rows, done)
       buf_util.tick(buf, math.floor((i - 1) / #rows * 100))
       return vim.schedule(step)
     end
-    buf_util.set(buf, lines)
-    for k, m in ipairs(meta) do
+    -- How much of what is on screen the new render agrees with. A log only
+    -- grows, so this is usually all of it, and the rest is an append.
+    local existing = api.nvim_buf_get_lines(buf, 0, -1, false)
+
+    ---@type table<integer, boolean>
+    local following = {}
+    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+      following[win] = api.nvim_win_get_cursor(win)[1] >= #existing
+    end
+
+    -- The last line of a log still being written arrives incomplete and is
+    -- finished by the next read, so agreement usually stops one line short of
+    -- the end. Rewriting from there is still only the tail.
+    local keep = 0
+    while keep < #existing and keep < #lines and existing[keep + 1] == lines[keep + 1] do
+      keep = keep + 1
+    end
+    if keep == #lines and keep == #existing then
+      return done(following)
+    end
+
+    buf_util.set(buf, lines, keep)
+    for k = keep + 1, #meta do
+      local m = meta[k]
       local prefix = math.min(m.conceal, #lines[k])
       if prefix > 0 then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
@@ -378,9 +400,26 @@ local function paint(buf, gen, rows, done)
         })
       end
     end
-    done()
+    done(following)
   end
   step()
+end
+
+--- Holds a growing log open and keeps anyone already at the end there. Folds
+--- would hide the very lines being waited for, and a fixed line is the wrong
+--- place to stand in a buffer that is still getting longer.
+---@param buf integer
+---@param following table<integer, boolean>
+local function tail(buf, following)
+  local last = api.nvim_buf_line_count(buf)
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    api.nvim_win_call(win, function()
+      vim.wo[win][0].foldlevel = 99
+      if following[win] then
+        api.nvim_win_set_cursor(win, { last, 0 })
+      end
+    end)
+  end
 end
 
 --- 404 is a log that was never written, 410 one that has aged out. Neither
@@ -464,9 +503,14 @@ function M.render(buf, gen, u)
       vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true })
       buf_util.watch(buf)
     end
-    paint(buf, gen, rows, function()
+    paint(buf, gen, rows, function(following)
       vim.b[buf].ci_loaded = true
       times(buf, showing or false)
+      -- A log still being written is read at its end, so it is left open and
+      -- the cursor rides the last line for anyone already sitting there.
+      if vim.tbl_get(vim.b[buf], 'ci', 'pending') then
+        return tail(buf, following)
+      end
       if reload then
         return buf_util.restore_view(buf)
       end

@@ -65,9 +65,8 @@ local function unsettled(b)
   return false
 end
 
---- Keeps a buffer in step with a run that has not settled. The reload path is
---- the same one `R` uses, so the view is restored and a failed poll leaves
---- what was already on screen.
+--- Keeps a buffer in step with a run that has not settled. A failed poll
+--- leaves what was already on screen.
 ---@param buf integer
 function M.watch(buf)
   if timers[buf] then
@@ -85,9 +84,11 @@ function M.watch(buf)
         return M.unwatch(buf)
       end
       quiet = true
-      local ok = pcall(api.nvim_buf_call, buf, function()
-        vim.cmd('silent edit')
-      end)
+      -- Not `:edit`: that empties the buffer before anything is fetched, so
+      -- every poll would be a rewrite of a log that only ever grew at the end.
+      -- Rendering straight into the buffer leaves the old lines, and the
+      -- extmarks and folds over them, in place until there is more to add.
+      local ok = pcall(M.load, buf, api.nvim_buf_get_name(buf))
       quiet = false
       if not ok then
         M.unwatch(buf)
@@ -155,11 +156,25 @@ function M.current(buf, gen)
   return api.nvim_buf_is_valid(buf) and vim.b[buf].ci_gen == gen
 end
 
+--- Replaces the buffer from {from} on, leaving everything before it and the
+--- extmarks over it alone. A growing log is a pure append, so a poll should
+--- not be a rewrite.
 ---@param buf integer
 ---@param lines string[]
-function M.set(buf, lines)
+---@param from? integer count of leading lines already correct
+function M.set(buf, lines, from)
+  from = from or 0
+  -- Marks belong to the lines they were put on, so they are dropped over
+  -- exactly the range being rewritten and no further.
+  api.nvim_buf_clear_namespace(buf, ansi.ns, from, -1)
   vim.bo[buf].modifiable = true
-  api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  api.nvim_buf_set_lines(
+    buf,
+    from,
+    -1,
+    false,
+    from > 0 and vim.list_slice(lines, from + 1) or lines
+  )
   vim.bo[buf].modifiable = false
   vim.bo[buf].busy = 0
   kept[buf] = nil
@@ -343,18 +358,19 @@ function M.load(buf, uri)
   ---@type ci.BufVar?
   local prev = vim.b[buf].ci
 
+  -- What a reload cannot rediscover is carried over: a Forgejo job knows its
+  -- name only from the list it was opened from, and a poll would blank it.
   ---@type ci.BufVar
   vim.b[buf].ci = {
     up = prev and prev.up or nil,
-    title = '',
-    status = '',
+    title = prev and prev.title or '',
+    status = prev and prev.status or '',
     repo = u.repo,
-    workflow = '',
-    url = '',
+    workflow = prev and prev.workflow or '',
+    url = prev and prev.url or '',
   }
 
   keymaps(buf, u.kind == 'job' and 'job' or 'list', require('ci.forge').is_github(u.host))
-  api.nvim_buf_clear_namespace(buf, ansi.ns, 0, -1)
 
   local gen = (vim.b[buf].ci_gen or 0) + 1
   vim.b[buf].ci_gen = gen
