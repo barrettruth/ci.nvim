@@ -1,3 +1,4 @@
+local api = vim.api
 local buf_util = require('ci.buf')
 local gh = require('ci.gh')
 local msg = require('ci.msg')
@@ -108,9 +109,16 @@ function M.run(arg, mods)
   -- The resolving kinds ask GitHub which commit or run is meant, and there is
   -- no buffer yet to mark busy while they do.
   local report = t.kind ~= 'job' and msg.progress(('Resolving %s'):format(arg or 'HEAD'))
+  -- Resolving a target is a round trip, and the window it was asked from is
+  -- the one it belongs in, not whichever happens to be current by the time
+  -- the answer lands.
+  local from = api.nvim_get_current_win()
   resolve(t, function(uri)
     if report then
       report('success')
+    end
+    if api.nvim_win_is_valid(from) then
+      api.nvim_set_current_win(from)
     end
     buf_util.open(uri, mods)
   end)
