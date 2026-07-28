@@ -20,34 +20,45 @@ for name, link in pairs(hl) do
   vim.api.nvim_set_hl(0, name, { default = true, link = link })
 end
 
---- The band behind an annotation. github.com fills the line with a dark red
---- or yellow, but no Neovim group carries a severity background: every
---- Diagnostic* group is foreground only, and the foreground is a light tint
---- that would be unreadable as a fill. So one is mixed, {ratio} of the way
---- from the window background toward the severity colour.
+--- The band behind an annotation. github.com fills the line, but no Neovim
+--- group carries a severity background: every Diagnostic* group is foreground
+--- only, and that foreground is a tint no one could read text on. So one is
+--- mixed, {RATIO} of the way from the window background toward it.
+---
+--- Three things can be missing. Without 'termguicolors' there is nothing to
+--- mix, since a palette index is a name rather than a colour. Without a
+--- Normal background — a colourscheme that lets the terminal show through —
+--- 'background' says which end of the range was meant. Without the severity
+--- colour itself there is nothing to mix toward, and the line keeps the
+--- foreground tint it had before.
+local RATIO = 0.18
+
 ---@param over string
 ---@return integer?
 local function wash(over)
-  local fg = vim.api.nvim_get_hl(0, { name = over, link = false }).fg
-  local bg = vim.api.nvim_get_hl(0, { name = 'Normal', link = false }).bg
-  if not fg or not bg then
+  if not vim.o.termguicolors then
     return nil
   end
-  local ratio = 0.18
+  local fg = vim.api.nvim_get_hl(0, { name = over, link = false }).fg
+  if not fg then
+    return nil
+  end
+  local bg = vim.api.nvim_get_hl(0, { name = 'Normal', link = false }).bg
+    or (vim.o.background == 'dark' and 0x000000 or 0xffffff)
   local out = 0
   for _, shift in ipairs({ 16, 8, 0 }) do
     local a = math.floor(bg / 2 ^ shift) % 256
     local b = math.floor(fg / 2 ^ shift) % 256
-    out = out * 256 + math.floor(a + (b - a) * ratio + 0.5)
+    out = out * 256 + math.floor(a + (b - a) * RATIO + 0.5)
   end
   return out
 end
 
-vim.api.nvim_set_hl(0, 'CiBold', { default = true, bold = true })
-
+--- Recomputed rather than linked, so unlike every other group here these two
+--- cannot be `default`: that would keep the first value forever.
 local function bands()
   for name, over in pairs({ CiFailBand = 'CiFail', CiAttentionBand = 'CiAttention' }) do
-    vim.api.nvim_set_hl(0, name, { default = true, bg = wash(over) })
+    vim.api.nvim_set_hl(0, name, { bg = wash(over) })
   end
 end
 bands()
@@ -57,7 +68,11 @@ local group = vim.api.nvim_create_augroup('ci', { clear = true })
 vim.api.nvim_create_autocmd({ 'ColorScheme', 'OptionSet' }, {
   group = group,
   callback = function(args)
-    if args.event == 'ColorScheme' or args.match == 'background' then
+    if
+      args.event == 'ColorScheme'
+      or args.match == 'background'
+      or args.match == 'termguicolors'
+    then
       bands()
     end
   end,

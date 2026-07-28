@@ -100,7 +100,7 @@ are then hidden with |conceal|. Step headers are added for clarity, and
 Show log timestamps (hidden by default) with `gS` or via setting
 `conceallevel` natively. The former is formatted for reading, the latter
 uncovers the concealed prefixes (ISO timestamps, `##[...]` markers). Neither
-is the raw log; for that, see |:terminal| below.
+is the raw log; for that, see the |:terminal| below.
 
 Escape sequences are the only other bytes removed: SGR ones become highlights,
 the rest have nothing to say in a text buffer. Use the |:terminal| to view the
@@ -142,6 +142,13 @@ All groups are links and can be overridden.
     CiCommand    ->  Directory            a `[command]` line
     CiUrl        ->  Underlined           a link in the log
     CiMuted      ->  Comment              secondary columns
+
+`CiFailBand` and `CiAttentionBand` fill an annotation's line. They are the
+only two that are mixed rather than linked, since no group carries a severity
+background: the colour is `Normal`'s background moved a fifth of the way
+toward `CiFail` or `CiAttention`, recomputed on |ColorScheme|. Without
+'termguicolors', or where either colour is unset, there is no fill and the
+line keeps its foreground tint.
 
 Log colours are derived from the ANSI escapes in the log itself and follow
 your terminal palette (`g:terminal_color_0` through `g:terminal_color_15`).
