@@ -147,15 +147,14 @@ All groups are links and can be overridden.
     CiUrl        ->  Underlined           a link in the log
     CiMuted      ->  Comment              secondary columns
 
-`CiFailBand` and `CiAttentionBand` fill an annotation's line. They are the
-only two that are mixed rather than linked, since no group carries a severity
-background: the colour is `Normal`'s background moved a fifth of the way
-toward `CiFail` or `CiAttention`, recomputed on |ColorScheme|. Without
-'termguicolors', or where either colour is unset, there is no fill and the
-line keeps its foreground tint.
-
 Log colours are derived from the ANSI escapes in the log itself and follow
 your terminal palette (`g:terminal_color_0` through `g:terminal_color_15`).
+
+`CiFailBand` and `CiAttentionBand` fill an annotation's line. Their color is
+`Normal`'s background moved a fifth of the way toward `CiFail` or
+`CiAttention`, recomputed on |ColorScheme|. Without 'termguicolors', or where
+either colour is unset, there is no fill and the line keeps its foreground
+tint.
 
 ==============================================================================
 HEALTH                                                             *ci-health*
@@ -170,7 +169,7 @@ Running jobs do not display logs (limitation of GitHub). `gh` has tracked the
 same limitation since 2021: >
     https://github.com/cli/cli/issues/3484
 <
-Until then a running job shows its steps, and becomes the log once it
-finishes.
+Until then a running job shows its steps. Once finished the job automatically
+refreshes to display the newly available logs.
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:
