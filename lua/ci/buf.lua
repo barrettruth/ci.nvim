@@ -14,13 +14,11 @@ local M = {}
 ---@field attempt? integer
 
 ---@class ci.BufVar
----@field kind 'job'|'list'
 ---@field title string
 ---@field status string
 ---@field repo string
 ---@field workflow string
 ---@field url string
----@field run_id integer
 ---@field up? string
 ---@field checks? ci.Check[]
 
@@ -214,14 +212,12 @@ function M.load(buf, uri)
 
   ---@type ci.BufVar
   vim.b[buf].ci = {
-    kind = u.kind == 'job' and 'job' or 'list',
     up = prev and prev.up or nil,
     title = '',
     status = '',
     repo = u.repo,
     workflow = '',
     url = '',
-    run_id = 0,
   }
 
   keymaps(buf, u.kind == 'job' and 'job' or 'list')

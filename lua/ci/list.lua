@@ -129,7 +129,6 @@ local function jobs_to_checks(jobs)
       conclusion = j.conclusion,
       url = j.html_url,
       job_id = j.id,
-      run_id = j.run_id,
       workflow = j.workflow_name,
     }
   end
