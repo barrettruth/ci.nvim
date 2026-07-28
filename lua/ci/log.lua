@@ -382,12 +382,11 @@ end
 ---@param buf integer
 ---@param job ci.gh.Job
 local function steplist(buf, job)
-  local lines, marks, checks = {}, {}, {}
+  local lines, marks = {}, {}
   for i, s in ipairs(job.steps or {}) do
     local sym, hl = status.of(s.status, s.conclusion)
     lines[i] = ('%s %s'):format(sym, s.name)
     marks[i] = hl
-    checks[i] = { name = s.name, status = s.status, conclusion = s.conclusion }
   end
   buf_util.set(buf, lines)
   for i, hl in ipairs(marks) do
@@ -399,8 +398,9 @@ local function steplist(buf, job)
       { end_col = #tostring(lines[i]), hl_group = hl }
     )
   end
-  ---@diagnostic disable-next-line: assign-type-mismatch
-  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { checks = checks })
+  -- A step is not a check, so it is not offered to <CR>; the flag is only
+  -- here to tell the poll this buffer has not finished.
+  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true })
   vim.b[buf].ci_loaded = true
   buf_util.watch(buf)
 end

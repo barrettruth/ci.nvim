@@ -21,6 +21,7 @@ local M = {}
 ---@field url string
 ---@field up? string
 ---@field checks? ci.Check[]
+---@field pending? boolean
 
 local KINDS = { job = true, run = true, checks = true, pr = true }
 
@@ -40,9 +41,30 @@ local timers = {}
 --- asked once, and a message every tick would be worse than none.
 local quiet = false
 
+---@type table<integer, boolean>
+local reported = {}
+
 local POLL = 10000
 
---- Keeps a list in step with a run that has not settled. The reload path is
+--- Whether anything in {b} has yet to finish. A job says so outright; a list
+--- is asked check by check.
+---@param b ci.BufVar
+---@return boolean
+local function unsettled(b)
+  if b.pending then
+    return true
+  end
+  local status = require('ci.status')
+  for _, c in pairs(b.checks or {}) do
+    local bucket = status.bucket(c.status, c.conclusion)
+    if bucket == 'running' or bucket == 'pending' then
+      return true
+    end
+  end
+  return false
+end
+
+--- Keeps a buffer in step with a run that has not settled. The reload path is
 --- the same one `R` uses, so the view is restored and a failed poll leaves
 --- what was already on screen.
 ---@param buf integer
@@ -58,25 +80,17 @@ function M.watch(buf)
     vim.schedule_wrap(function()
       ---@type ci.BufVar?
       local b = api.nvim_buf_is_valid(buf) and vim.b[buf].ci or nil
-      if not b or not b.checks or #vim.fn.win_findbuf(buf) == 0 then
+      if not b or #vim.fn.win_findbuf(buf) == 0 or not unsettled(b) then
         return M.unwatch(buf)
       end
-      local status = require('ci.status')
-      for _, c in pairs(b.checks) do
-        local bucket = status.bucket(c.status, c.conclusion)
-        if bucket == 'running' or bucket == 'pending' then
-          quiet = true
-          local ok = pcall(api.nvim_buf_call, buf, function()
-            vim.cmd('silent edit')
-          end)
-          quiet = false
-          if not ok then
-            M.unwatch(buf)
-          end
-          return
-        end
+      quiet = true
+      local ok = pcall(api.nvim_buf_call, buf, function()
+        vim.cmd('silent edit')
+      end)
+      quiet = false
+      if not ok then
+        M.unwatch(buf)
       end
-      M.unwatch(buf)
     end)
   )
 end
@@ -147,6 +161,7 @@ function M.set(buf, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].busy = 0
   kept[buf] = nil
+  reported[buf] = nil
   settle(buf, 'success')
 end
 
@@ -159,6 +174,12 @@ function M.fail(buf, err)
     M.set(buf, kept[buf])
     M.restore_view(buf)
   end
+  -- A poll that keeps failing says so once. Repeating it every ten seconds
+  -- tells the reader nothing they were not already told.
+  if quiet and reported[buf] then
+    return
+  end
+  reported[buf] = quiet
   msg.err(err)
 end
 
@@ -193,6 +214,7 @@ end
 ---@param buf integer
 function M.forget(buf)
   M.unwatch(buf)
+  reported[buf] = nil
   settle(buf, 'success')
   views[buf] = nil
   kept[buf] = nil
