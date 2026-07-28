@@ -117,6 +117,7 @@ end
 ---@field hl? ci.Hl
 ---@field step? boolean
 ---@field conceal integer
+---@field label? string
 ---@field time? string
 
 --- Splits a job log into rows. Lines are kept whole, with an offset marking
@@ -136,7 +137,7 @@ function M.parse(text, steps)
   ---@param fold ci.log.Fold
   ---@param hl? ci.Hl
   ---@param step? boolean
-  local function emit(line, fold, hl, step, conceal)
+  local function emit(line, fold, hl, step, conceal, label)
     conceal = conceal or 0
     rows[#rows + 1] = {
       text = line,
@@ -144,6 +145,7 @@ function M.parse(text, steps)
       hl = hl,
       step = step,
       conceal = conceal,
+      label = label,
       time = conceal > 0 and human(line:sub(1, 19)) or nil,
     }
   end
@@ -195,11 +197,11 @@ function M.parse(text, steps)
       emit(raw, '>2', 'CiGroup', nil, ts + #body - #group)
     elseif err then
       in_group = false
-      emit(raw, '1', 'CiFail', nil, ts + #body - #err)
+      emit(raw, '1', 'CiFail', nil, ts + #body - #err, 'Error: ')
     elseif warn then
-      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn)
+      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn, 'Warning: ')
     elseif notice then
-      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice)
+      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice, 'Notice: ')
     elseif command then
       emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
     elseif body ~= '' or #rows > 0 then
@@ -249,6 +251,7 @@ end
 ---@field hl? ci.Hl
 ---@field urls ci.ansi.Span[]
 ---@field conceal integer
+---@field label? string
 ---@field indent integer
 ---@field time? string
 
@@ -276,6 +279,7 @@ local function paint(buf, gen, rows, done)
         hl = rows[k].hl,
         urls = urls(text),
         conceal = rows[k].conceal,
+        label = rows[k].label,
         indent = depth(rows[k].fold),
         time = rows[k].time,
       }
@@ -291,9 +295,18 @@ local function paint(buf, gen, rows, done)
       if prefix > 0 then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
       end
-      if m.indent > 0 and prefix < #lines[k] then
+      -- github.com draws a word where the marker is; the marker itself is
+      -- concealed, so the word has to be virtual like the indent beside it.
+      local pre = {}
+      if m.indent > 0 then
+        pre[#pre + 1] = { ('  '):rep(m.indent) }
+      end
+      if m.label then
+        pre[#pre + 1] = { m.label, m.hl }
+      end
+      if #pre > 0 and prefix < #lines[k] then
         api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, {
-          virt_text = { { ('  '):rep(m.indent) } },
+          virt_text = pre,
           virt_text_pos = 'inline',
         })
       end
