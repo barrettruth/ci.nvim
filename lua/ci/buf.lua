@@ -33,6 +33,64 @@ local kept = {}
 ---@type table<integer, fun(status: 'running'|'success'|'failed', percent?: integer)>
 local reports = {}
 
+---@type table<integer, uv.uv_timer_t>
+local timers = {}
+
+--- Set while a poll reloads a buffer, so the refresh is silent: the reader
+--- asked once, and a message every tick would be worse than none.
+local quiet = false
+
+local POLL = 10000
+
+--- Keeps a list in step with a run that has not settled. The reload path is
+--- the same one `R` uses, so the view is restored and a failed poll leaves
+--- what was already on screen.
+---@param buf integer
+function M.watch(buf)
+  if timers[buf] then
+    return
+  end
+  local t = assert(vim.uv.new_timer())
+  timers[buf] = t
+  t:start(
+    POLL,
+    POLL,
+    vim.schedule_wrap(function()
+      ---@type ci.BufVar?
+      local b = api.nvim_buf_is_valid(buf) and vim.b[buf].ci or nil
+      if not b or not b.checks or #vim.fn.win_findbuf(buf) == 0 then
+        return M.unwatch(buf)
+      end
+      local status = require('ci.status')
+      for _, c in pairs(b.checks) do
+        local bucket = status.bucket(c.status, c.conclusion)
+        if bucket == 'running' or bucket == 'pending' then
+          quiet = true
+          local ok = pcall(api.nvim_buf_call, buf, function()
+            vim.cmd('silent edit')
+          end)
+          quiet = false
+          if not ok then
+            M.unwatch(buf)
+          end
+          return
+        end
+      end
+      M.unwatch(buf)
+    end)
+  )
+end
+
+---@param buf integer
+function M.unwatch(buf)
+  local t = timers[buf]
+  timers[buf] = nil
+  if t then
+    t:stop()
+    t:close()
+  end
+end
+
 ---@param buf integer
 ---@param status 'success'|'failed'
 local function settle(buf, status)
@@ -134,6 +192,7 @@ end
 
 ---@param buf integer
 function M.forget(buf)
+  M.unwatch(buf)
   settle(buf, 'success')
   views[buf] = nil
   kept[buf] = nil
@@ -209,6 +268,15 @@ function M.enter()
   end
   if check.job_id then
     local from = api.nvim_buf_get_name(buf)
+    local bucket = require('ci.status').bucket(check.status, check.conclusion)
+    if (bucket == 'running' or bucket == 'pending') and check.run_id then
+      -- No log exists yet and none will stream, so hand the wait to `gh`.
+      vim.cmd(('terminal gh run watch --repo %s %d --interval 10'):format(u.repo, check.run_id))
+      local term = api.nvim_get_current_buf()
+      vim.b[term].ci = { up = from }
+      map(term, '-', 'up', 'Go back to the list you came from')
+      return
+    end
     M.open(('ci://%s/job/%d'):format(u.repo, check.job_id), { keepalt = true })
     local job = api.nvim_get_current_buf()
     vim.b[job].ci = vim.tbl_extend('force', vim.b[job].ci, { up = from })
@@ -264,9 +332,11 @@ function M.load(buf, uri)
   vim.b[buf].ci_gen = gen
   vim.bo[buf].busy = 1
   settle(buf, 'success')
-  reports[buf] = msg.progress(
-    ('Loading %s %s'):format(u.repo, u.kind == 'checks' and 'checks' or u.kind .. ' ' .. u.id)
-  )
+  if not quiet then
+    reports[buf] = msg.progress(
+      ('Loading %s %s'):format(u.repo, u.kind == 'checks' and 'checks' or u.kind .. ' ' .. u.id)
+    )
+  end
 
   if u.kind == 'job' then
     require('ci.log').render(buf, gen, u)

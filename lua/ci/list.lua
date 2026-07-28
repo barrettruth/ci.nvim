@@ -80,6 +80,7 @@ local function paint(buf, gen, repo, summary, title, checks)
     checks = map,
   })
   vim.b[buf].ci_loaded = true
+  buf_util.watch(buf)
 end
 
 ---@param checks ci.Check[]
@@ -129,6 +130,7 @@ local function jobs_to_checks(jobs)
       conclusion = j.conclusion,
       url = j.html_url,
       job_id = j.id,
+      run_id = j.run_id,
       workflow = j.workflow_name,
     }
   end

@@ -114,8 +114,10 @@ MAPPINGS                                                         *ci-mappings*
 Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
 
     <CR>    <Plug>(ci-open)        In a checks list, open the check under
-                                   the cursor. Checks that are not Actions
-                                   jobs open in a browser.
+                                   the cursor. A check still running opens
+                                   `gh run watch` in a |terminal| instead.
+                                   Checks that are not Actions jobs open in
+                                   a browser.
     -       <Plug>(ci-up)          Go back to the list you came from.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
     ]]      <Plug>(ci-next-step)   In a job log, go to the next step.
@@ -159,5 +161,15 @@ HEALTH                                                             *ci-health*
 Checks the Neovim version, `gh`, and its authentication: >
     :checkhealth ci
 <
+==============================================================================
+LIMITATIONS                                                   *ci-limitations*
+
+Running jobs do not display logs (limitation of GitHub). `gh` has tracked the
+same limitation since 2021: >
+    https://github.com/cli/cli/issues/3484
+<
+Instead, ci.nvim makes `<CR>` on a running check shell off to `gh run watch`,
+which reports aggregate step status instead of actual output. Once it ends,
+press `-` and then |<CR>| to open the log.
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

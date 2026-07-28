@@ -143,6 +143,7 @@ query($owner:String!,$repo:String!,$expr:String!){
 ---@field conclusion? ci.Conclusion
 ---@field url? string
 ---@field job_id? integer
+---@field run_id? integer
 ---@field workflow? string
 ---@field started_at? string
 
@@ -157,13 +158,14 @@ local function to_checks(nodes)
     ---@type ci.Check?
     local c
     if n.__typename == 'CheckRun' then
-      local _, job_id = (n.detailsUrl or ''):match('/actions/runs/(%d+)/job/(%d+)')
+      local run_id, job_id = (n.detailsUrl or ''):match('/actions/runs/(%d+)/job/(%d+)')
       c = {
         name = n.name,
         status = n.status,
         conclusion = n.conclusion,
         url = n.detailsUrl,
         job_id = tonumber(job_id) or n.databaseId,
+        run_id = tonumber(run_id),
         workflow = vim.tbl_get(n, 'checkSuite', 'workflowRun', 'workflow', 'name'),
         started_at = n.startedAt,
       }
@@ -300,6 +302,7 @@ end
 
 ---@class ci.gh.Job
 ---@field id integer
+---@field run_id integer
 ---@field head_sha? string
 ---@field name string
 ---@field status ci.rest.Status
