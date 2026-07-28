@@ -150,11 +150,11 @@ All groups are links and can be overridden.
 Log colours are derived from the ANSI escapes in the log itself and follow
 your terminal palette (`g:terminal_color_0` through `g:terminal_color_15`).
 
-`CiFailBand` and `CiAttentionBand` fill an annotation's line. Their color is
-`Normal`'s background moved a fifth of the way toward `CiFail` or
-`CiAttention`, recomputed on |ColorScheme|. Without 'termguicolors', or where
-either colour is unset, there is no fill and the line keeps its foreground
-tint.
+`CiFailBand` and `CiAttentionBand` fill the line behind an `##[error]` or
+`##[warning]`. Their color is `Normal`'s background moved a fifth of the way
+toward `CiFail` or `CiAttention`, recomputed on |ColorScheme|. Without
+'termguicolors', or where either colour is unset, there is no fill and the
+line keeps its foreground tint.
 
 ==============================================================================
 HEALTH                                                             *ci-health*
