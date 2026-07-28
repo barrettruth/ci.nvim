@@ -14,13 +14,13 @@ real ANSI colours, step-level folds, and more.
 
 ## Requirements
 
-- Neovim 0.11+
+- Neovim 0.13+
 - [`gh`](https://cli.github.com), authenticated
 - `git`
 
 ## Installation
 
-With `vim.pack` (Neovim 0.12+):
+With `vim.pack`:
 
 ```lua
 vim.pack.add({

@@ -1,6 +1,7 @@
 local buf_util = require('ci.buf')
 local gh = require('ci.gh')
 local msg = require('ci.msg')
+local progress = require('ci.progress')
 local target = require('ci.target')
 
 local M = {}
@@ -110,7 +111,13 @@ function M.run(arg, mods)
   if not t then
     return err(e or ('cannot resolve: %s'):format(arg))
   end
+  -- The resolving kinds ask GitHub which commit or run is meant, and there is
+  -- no buffer yet to mark busy while they do.
+  local report = t.kind ~= 'job' and progress(('Resolving %s'):format(arg or 'HEAD'))
   resolve(t, function(uri)
+    if report then
+      report('success')
+    end
     buf_util.open(uri, mods)
   end)
 end
