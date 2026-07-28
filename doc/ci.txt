@@ -188,23 +188,18 @@ limitation since 2021: >
 Until then a running job shows its steps. Once finished the job automatically
 refreshes to display the newly available logs.
 
-Forgejo does not expose per-step boundaries for a job, in its API, its log
-text, or its run archive. The boundaries exist in its database, but only its
-web interface can reach them. Step folds, step headers, and `[[`/`]]` are
-therefore GitHub-only.
+Forgejo's Actions API is younger than GitHub's, so it has quite a few
+behaviors missing
 
-Forgejo has no server-side revision parsing, so `:CI {rev}` is resolved with
-local `git rev-parse` and sees only what you have fetched.
+Firstly, Forgejo will not say where one step of a job ends and the next
+begins. Resultedly, a job log folds on `##[group]` alone. Step folds, step
+headers, and `[[`/`]]` are GitHub-only.
 
-Forgejo has no single-job endpoint. A job opened from a pasted URL shows its
-log with no name or status; opened from a list it inherits both.
+Forgejo 16.0+ also lacks fetching individual jobs and does not resolve
+revisions remotely. Therefore, `:CI {rev}` only sees what you've fetched.
+Individual jobs cannot be fetched either, meaning job URLs opened directly do
+not show name nor status. Lastly, this also means that older job attemps
+(100+) cannot be fetched
 
-A Forgejo job id is stable across reruns and always answers with the newest
-attempt, where GitHub mints a new id per attempt and a URL pins one. Earlier
-attempts are not reachable.
-
-A Forgejo run URL names the run by its index within the repository, not by the
-id its API answers to. The two are matched by searching recent runs, so a link
-to a long-past run reports rather than resolves.
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:
