@@ -94,15 +94,17 @@ to disable all folds always: >lua
 
 Actions logs are (mostly) concealed and transformed rather than deleted. For
 example, every line keeps its timestamp and internal `##[...]` marker which
-are then hidden with |conceal|. Step headers are added for clarity.
+are then hidden with |conceal|. Step headers are added for clarity, and
+`##[endgroup]` is dropped, having become the end of a fold.
 
 Show log timestamps (hidden by default) with `gS` or via setting
 `conceallevel` natively. The former is formatted for reading, the latter
 uncovers the concealed prefixes (ISO timestamps, `##[...]` markers). Neither
 is the raw log; for that, see |:terminal| below.
 
-ANSI escapes are the only bytes actually removed, since they become
-highlights. Use the |:terminal| to view the log exactly as GitHub stores it: >
+Escape sequences are the only other bytes removed: SGR ones become highlights,
+the rest have nothing to say in a text buffer. Use the |:terminal| to view the
+log exactly as GitHub stores it: >
     :term gh api repos/{owner}/{repo}/actions/jobs/{job_id}/logs
 <
 
@@ -114,7 +116,7 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
     <CR>    <Plug>(ci-open)        In a checks list, open the check under
                                    the cursor. Checks that are not Actions
                                    jobs open in a browser.
-    -       <Plug>(ci-up)          Go to the checks for this commit.
+    -       <Plug>(ci-up)          Go back to the list you came from.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
     gS      <Plug>(ci-timestamps)  In a job log, toggle the timestamps.
     gX      <Plug>(ci-web)         Open the current buffer on github.com.
@@ -135,6 +137,8 @@ All groups are links and can be overridden.
     CiSkipped    ->  Comment           ⊘  skipped, neutral, stale, cancelled
     CiAttention  ->  DiagnosticWarn    !  action required
     CiGroup      ->  Title                a `##[group]` heading
+    CiCommand    ->  Directory            a `[command]` line
+    CiUrl        ->  Underlined           a link in the log
     CiMuted      ->  Comment              secondary columns
 
 Log colours are derived from the ANSI escapes in the log itself and follow

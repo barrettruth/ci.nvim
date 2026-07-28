@@ -116,7 +116,7 @@ end
 plug('open', 'Open the check under the cursor', function()
   require('ci.buf').enter()
 end)
-plug('up', 'Go to the parent run', function()
+plug('up', 'Go back to the list you came from', function()
   require('ci.buf').up()
 end)
 plug('web', 'Open on github.com', function()
