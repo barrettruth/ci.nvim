@@ -281,6 +281,7 @@ local function paint(buf, gen, rows, done)
     end
     i = last + 1
     if i <= #rows then
+      buf_util.tick(buf, math.floor((i - 1) / #rows * 100))
       return vim.schedule(step)
     end
     buf_util.set(buf, lines)

@@ -4,24 +4,30 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     systems.url = "github:nix-systems/default";
+    neovim = {
+      url = "github:nix-community/neovim-nightly-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
     {
       nixpkgs,
       systems,
+      neovim,
       ...
     }:
     let
-      forEachSystem =
-        f: nixpkgs.lib.genAttrs (import systems) (system: f nixpkgs.legacyPackages.${system});
+      forEachSystem = f: nixpkgs.lib.genAttrs (import systems) (system: f system);
     in
     {
-      formatter = forEachSystem (pkgs: pkgs.nixfmt-tree);
+      formatter = forEachSystem (system: nixpkgs.legacyPackages.${system}.nixfmt-tree);
 
       devShells = forEachSystem (
-        pkgs:
+        system:
         let
+          pkgs = nixpkgs.legacyPackages.${system};
+          nvim = neovim.packages.${system}.default;
           devTools = [
             (pkgs.luajit.withPackages (
               ps: with ps; [
@@ -35,11 +41,11 @@
             pkgs.selene
             pkgs.lua-language-server
             pkgs.vimdoc-language-server
-            pkgs.neovim
+            nvim
           ];
           shell = pkgs.mkShell {
             packages = devTools;
-            VIMRUNTIME = "${pkgs.neovim.unwrapped}/share/nvim/runtime";
+            VIMRUNTIME = "${nvim}/share/nvim/runtime";
           };
         in
         {

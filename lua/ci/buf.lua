@@ -1,5 +1,6 @@
 local ansi = require('ci.ansi')
 local msg = require('ci.msg')
+local progress = require('ci.progress')
 
 local api = vim.api
 
@@ -29,6 +30,28 @@ local views = {}
 
 ---@type table<integer, string[]>
 local kept = {}
+
+---@type table<integer, fun(status: 'running'|'success'|'failed', percent?: integer)>
+local reports = {}
+
+---@param buf integer
+---@param status 'success'|'failed'
+local function settle(buf, status)
+  local report = reports[buf]
+  reports[buf] = nil
+  if report then
+    report(status)
+  end
+end
+
+--- Advances the |progress-message| for {buf}, if one is running.
+---@param buf integer
+---@param percent integer
+function M.tick(buf, percent)
+  if reports[buf] then
+    reports[buf]('running', percent)
+  end
+end
 
 ---@param uri string
 ---@return ci.Uri?
@@ -67,12 +90,14 @@ function M.set(buf, lines)
   vim.bo[buf].modifiable = false
   vim.bo[buf].busy = 0
   kept[buf] = nil
+  settle(buf, 'success')
 end
 
 ---@param buf integer
 ---@param err string
 function M.fail(buf, err)
   vim.bo[buf].busy = 0
+  settle(buf, 'failed')
   if kept[buf] then
     M.set(buf, kept[buf])
     M.restore_view(buf)
@@ -110,6 +135,7 @@ end
 
 ---@param buf integer
 function M.forget(buf)
+  settle(buf, 'success')
   views[buf] = nil
   kept[buf] = nil
   require('ci.log').forget(buf)
@@ -238,6 +264,10 @@ function M.load(buf, uri)
   local gen = (vim.b[buf].ci_gen or 0) + 1
   vim.b[buf].ci_gen = gen
   vim.bo[buf].busy = 1
+  settle(buf, 'success')
+  reports[buf] = progress(
+    ('Loading %s %s'):format(u.repo, u.kind == 'checks' and 'checks' or u.kind .. ' ' .. u.id)
+  )
 
   if u.kind == 'job' then
     require('ci.log').render(buf, gen, u)
