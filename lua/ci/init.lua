@@ -1,15 +1,9 @@
 local buf_util = require('ci.buf')
 local gh = require('ci.gh')
 local msg = require('ci.msg')
-local progress = require('ci.progress')
 local target = require('ci.target')
 
 local M = {}
-
----@param m string
-local function err(m)
-  msg(m, vim.log.levels.ERROR)
-end
 
 ---@return string? name
 local function branch()
@@ -42,7 +36,7 @@ local function resolve(t, on_uri)
   if t.kind == 'workflow' then
     return gh.latest_run(t.file, t.repo, function(run, e)
       if e then
-        return err(e)
+        return msg.err(e)
       end
       on_uri(('ci://%s/run/%d'):format(t.repo, run.id))
     end)
@@ -51,7 +45,7 @@ local function resolve(t, on_uri)
   if t.kind == 'repo' then
     return gh.rollup('HEAD^{commit}', t.repo, function(res, e)
       if e then
-        return err(e)
+        return msg.err(e)
       end
       on_uri(('ci://%s/checks/%s'):format(res.repo or t.repo, res.oid))
     end)
@@ -60,7 +54,7 @@ local function resolve(t, on_uri)
   if t.kind == 'rev' then
     return gh.rollup(t.expr, t.repo, function(res, e)
       if e then
-        return err(e)
+        return msg.err(e)
       end
       on_uri(('ci://%s/checks/%s'):format(res.repo or t.repo, res.oid))
     end)
@@ -68,26 +62,26 @@ local function resolve(t, on_uri)
 
   local head = branch()
   if not head then
-    return err('not in a git repository')
+    return msg.err('not in a git repository')
   end
   if head == 'HEAD' then
     return gh.rollup('HEAD^{commit}', nil, function(res, e)
       if e then
-        return err(e)
+        return msg.err(e)
       end
       on_uri(('ci://%s/checks/%s'):format(res.repo, res.oid))
     end)
   end
   gh.pr_for_branch(head, nil, function(pr, e)
     if e then
-      return err(e)
+      return msg.err(e)
     end
     if pr then
       return on_uri(('ci://%s/pr/%d'):format(pr.repo, pr.number))
     end
     gh.rollup(head .. '^{commit}', nil, function(res, e2)
       if e2 then
-        return err(('no open pull request for %s, and %s'):format(head, e2))
+        return msg.err(('no open pull request for %s, and %s'):format(head, e2))
       end
       on_uri(('ci://%s/checks/%s'):format(res.repo, res.oid))
     end)
@@ -102,18 +96,18 @@ function M.run(arg, mods)
     arg = (arg:gsub('[%)%]}>.,;:"\']+$', ''))
   end
   if vim.fn.executable('gh') == 0 then
-    return err('gh is not on $PATH; see https://cli.github.com')
+    return msg.err('gh is not on $PATH; see https://cli.github.com')
   end
   if arg and vim.startswith(arg, 'ci://') then
     return buf_util.open(arg, mods)
   end
   local t, e = target.parse(arg)
   if not t then
-    return err(e or ('cannot resolve: %s'):format(arg))
+    return msg.err(e or ('cannot resolve: %s'):format(arg))
   end
   -- The resolving kinds ask GitHub which commit or run is meant, and there is
   -- no buffer yet to mark busy while they do.
-  local report = t.kind ~= 'job' and progress(('Resolving %s'):format(arg or 'HEAD'))
+  local report = t.kind ~= 'job' and msg.progress(('Resolving %s'):format(arg or 'HEAD'))
   resolve(t, function(uri)
     if report then
       report('success')
