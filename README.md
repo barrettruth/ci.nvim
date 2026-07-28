@@ -66,4 +66,4 @@ under the cursor, `-` goes back to the list you came from, walk job steps with
 
 ## Known limitations
 
-- **In Progress Jobs**: GitHub/gh cli [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their status only, until completion.
+- **In Progress Jobs**: GitHub/gh cli [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their step status only, until completion.
