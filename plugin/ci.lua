@@ -123,7 +123,11 @@ vim.api.nvim_create_autocmd({ 'BufWinEnter', 'BufReadPost' }, {
     if job then
       vim.wo[0][0].foldmethod = 'expr'
       vim.wo[0][0].foldexpr = 'v:lua.require("ci.log").fold(v:lnum)'
-      vim.wo[0][0].foldlevel = 0
+      -- A poll reloads the buffer, which lands here again. Closing every fold
+      -- belongs to the first sight of a log, not to every refresh of one.
+      if not vim.b[args.buf].ci_loaded then
+        vim.wo[0][0].foldlevel = 0
+      end
       vim.wo[0][0].conceallevel = 3
       vim.wo[0][0].concealcursor = 'nvic'
       vim.wo[0][0].foldtext = 'v:lua.require("ci.log").foldtext()'
