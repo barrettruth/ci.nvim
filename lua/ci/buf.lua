@@ -1,6 +1,5 @@
 local ansi = require('ci.ansi')
 local msg = require('ci.msg')
-local progress = require('ci.progress')
 
 local api = vim.api
 
@@ -102,7 +101,7 @@ function M.fail(buf, err)
     M.set(buf, kept[buf])
     M.restore_view(buf)
   end
-  msg(err, vim.log.levels.ERROR)
+  msg.err(err)
 end
 
 --- Records the view of every window showing {buf}. Called on |BufUnload|,
@@ -218,14 +217,14 @@ function M.enter()
   if check.url then
     return vim.ui.open(check.url)
   end
-  msg('no logs for this check', vim.log.levels.WARN)
+  msg.warn('no logs for this check')
 end
 
 function M.up()
   ---@type ci.BufVar?
   local b = vim.b[api.nvim_get_current_buf()].ci
   if not b or not b.up then
-    return msg('already at the top level', vim.log.levels.WARN)
+    return msg.warn('already at the top level')
   end
   M.open(b.up, { keepalt = true })
 end
@@ -265,7 +264,7 @@ function M.load(buf, uri)
   vim.b[buf].ci_gen = gen
   vim.bo[buf].busy = 1
   settle(buf, 'success')
-  reports[buf] = progress(
+  reports[buf] = msg.progress(
     ('Loading %s %s'):format(u.repo, u.kind == 'checks' and 'checks' or u.kind .. ' ' .. u.id)
   )
 

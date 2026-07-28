@@ -124,7 +124,7 @@ plug('web', 'Open on github.com', function()
   if url then
     vim.ui.open(url)
   else
-    require('ci.msg')('no URL for this buffer', vim.log.levels.WARN)
+    require('ci.msg').warn('no URL for this buffer')
   end
 end)
 plug('help', 'ci.nvim mappings', '<cmd>help ci-mappings<cr>')
