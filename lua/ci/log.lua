@@ -26,6 +26,21 @@ local stamps = {}
 
 local time_ns = api.nvim_create_namespace('ci.time')
 
+---@param buf integer
+---@param on boolean
+local function times(buf, on)
+  api.nvim_buf_clear_namespace(buf, time_ns, 0, -1)
+  if on then
+    for i, at in pairs(stamps[buf] or {}) do
+      api.nvim_buf_set_extmark(buf, time_ns, i - 1, 0, {
+        virt_text = { { at .. ' ', 'CiMuted' } },
+        virt_text_pos = 'inline',
+      })
+    end
+  end
+  vim.b[buf].ci_times = on
+end
+
 --- "2026-07-27T15:14:08" -> "Mon, 27 Jul 2026 15:14:08 GMT". The weekday needs
 --- real date arithmetic, so it is resolved once per day rather than per line.
 ---@param at string
@@ -306,6 +321,8 @@ function M.render(buf, gen, u)
     return buf_util.fail(buf, ('malformed job id: %s'):format(u.id))
   end
   local reload = vim.b[buf].ci_loaded
+  local showing = vim.b[buf].ci_times
+  times(buf, false)
 
   ---@type ci.gh.Job?, string?, boolean?
   local job, text, failed
@@ -326,6 +343,7 @@ function M.render(buf, gen, u)
     end
     paint(buf, gen, rows, function()
       vim.b[buf].ci_loaded = true
+      times(buf, showing or false)
       if reload then
         return buf_util.restore_view(buf)
       end
@@ -389,21 +407,9 @@ end
 --- leaves the ANSI highlights and the concealed prefix untouched.
 function M.timestamps()
   local buf = api.nvim_get_current_buf()
-  if not stamps[buf] then
-    return
+  if stamps[buf] then
+    times(buf, not vim.b[buf].ci_times)
   end
-  if vim.b[buf].ci_times then
-    api.nvim_buf_clear_namespace(buf, time_ns, 0, -1)
-    vim.b[buf].ci_times = false
-    return
-  end
-  for i, at in pairs(stamps[buf]) do
-    api.nvim_buf_set_extmark(buf, time_ns, i - 1, 0, {
-      virt_text = { { at .. ' ', 'CiMuted' } },
-      virt_text_pos = 'inline',
-    })
-  end
-  vim.b[buf].ci_times = true
 end
 
 return M
