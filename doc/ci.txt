@@ -18,7 +18,7 @@ REQUIREMENTS                                                 *ci-requirements*
 ==============================================================================
 INSTALL                                                           *ci-install*
 
-With |vim.pack|: >lua
+With |vim.pack| (Neovim 0.12+): >lua
     vim.pack.add({
       'https://forge.barrettruth.com/barrettruth/ci.nvim',
     })

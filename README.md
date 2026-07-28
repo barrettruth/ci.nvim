@@ -20,7 +20,7 @@ real ANSI colours, step-level folds, and more.
 
 ## Installation
 
-With `vim.pack`:
+With `vim.pack` (Neovim 0.12+):
 
 ```lua
 vim.pack.add({
