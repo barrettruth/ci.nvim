@@ -12,6 +12,7 @@ local hl = {
   CiAttention = 'DiagnosticWarn',
   CiGroup = 'Title',
   CiCommand = 'Directory',
+  CiDebug = 'Debug',
   CiUrl = 'Underlined',
   CiMuted = 'Comment',
 }

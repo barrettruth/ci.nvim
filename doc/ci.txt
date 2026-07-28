@@ -159,6 +159,7 @@ All groups are links and can be overridden.
     CiAttention  ->  DiagnosticWarn    !  action required
     CiGroup      ->  Title                a `##[group]` heading
     CiCommand    ->  Directory            a `[command]` line
+    CiDebug      ->  Debug                a `##[debug]` line
     CiUrl        ->  Underlined           a link in the log
     CiMuted      ->  Comment              secondary columns
 
