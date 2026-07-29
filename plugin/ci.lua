@@ -21,6 +21,11 @@ for name, link in pairs(hl) do
   vim.api.nvim_set_hl(0, name, { default = true, link = link })
 end
 
+--- The word standing in for a marker, which github.com sets in bold. It is an
+--- attribute rather than a link so that it can sit over the severity and the
+--- band without replacing either.
+vim.api.nvim_set_hl(0, 'CiBold', { default = true, bold = true })
+
 --- The band behind an annotation. github.com fills the line, but no Neovim
 --- group carries a severity background: every Diagnostic* group is foreground
 --- only, and that foreground is a tint no one could read text on. So one is
