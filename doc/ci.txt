@@ -162,6 +162,7 @@ All groups are links and can be overridden.
     CiDebug      ->  Debug                a `##[debug]` line
     CiUrl        ->  Underlined           a link in the log
     CiMuted      ->  Comment              secondary columns
+    CiBold       ->  bold                 `Error:` and `Warning:` themselves
 
 Log colours are derived from the ANSI escapes in the log itself and follow
 your terminal palette (`g:terminal_color_0` through `g:terminal_color_15`).
