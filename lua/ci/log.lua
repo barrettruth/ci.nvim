@@ -303,6 +303,7 @@ end
 ---@field urls ci.ansi.Span[]
 ---@field conceal integer
 ---@field label? string
+---@field step? boolean
 ---@field cont? boolean
 ---@field indent integer
 ---@field time? string
@@ -332,6 +333,7 @@ local function paint(buf, gen, rows, done)
         urls = urls(text),
         conceal = rows[k].conceal,
         label = rows[k].label,
+        step = rows[k].step,
         cont = rows[k].cont,
         indent = depth(rows[k].fold),
         time = rows[k].time,
@@ -372,7 +374,10 @@ local function paint(buf, gen, rows, done)
       end
       -- github.com draws a word where the marker is; the marker itself is
       -- concealed, so the word has to be virtual like the indent beside it.
-      local band = BAND[m.hl]
+      -- A band belongs to the message that carries a severity, not to
+      -- everything wearing its colour. A step is named in the foreground, the
+      -- way a passing one already is.
+      local band = not m.step and BAND[m.hl] or nil
       local pre = {}
       if m.indent > 0 then
         pre[#pre + 1] = { ('  '):rep(m.indent), band }
