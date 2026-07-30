@@ -72,7 +72,11 @@ local function api(path, on_done)
     end
     local ok, decoded = pcall(vim.json.decode, out, { luanil = { object = true, array = true } })
     if not ok or type(decoded) ~= 'table' then
-      return on_done(nil, 'malformed JSON from tea')
+      -- tea exits zero whatever came back, and not every failure arrives as
+      -- Forgejo's error envelope: a request that never reached a repository
+      -- answers in plain text. Say what it said.
+      local said = vim.trim((out or ''):gsub('\n.*$', ''))
+      return on_done(nil, said ~= '' and said or 'no response from tea')
     end
     local enveloped = envelope_error(decoded)
     if enveloped then
