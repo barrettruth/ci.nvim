@@ -5,6 +5,8 @@ local M = {}
 local RUN_SCAN = 100
 
 local GIT = 2000
+local API = 10000
+local LOG = 30000
 
 --- Forgejo ignores `limit` unless `page` is given with it, and answers with
 --- every row when it is not. Always ask for both.
@@ -42,10 +44,14 @@ end
 
 ---@param path string
 ---@param on_done fun(out?: string, err?: string)
-local function run(path, on_done)
-  return vim.system({ 'tea', 'api', path }, { text = true }, function(r)
+---@param timeout? integer
+local function run(path, on_done, timeout)
+  timeout = timeout or API
+  return vim.system({ 'tea', 'api', path }, { text = true, timeout = timeout }, function(r)
     vim.schedule(function()
-      if r.code ~= 0 then
+      if r.code == 124 then
+        on_done(nil, ('tea did not answer within %ds'):format(timeout / 1000))
+      elseif r.code ~= 0 then
         on_done(nil, errmsg(r))
       else
         on_done(r.stdout or '')
@@ -336,7 +342,7 @@ function M.job_log(id, repo, on_done)
       end
     end
     on_done(body)
-  end)
+  end, LOG)
 end
 
 --- A Forgejo runner closes every log with this, so its absence is the only

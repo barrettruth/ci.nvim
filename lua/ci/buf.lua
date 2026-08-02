@@ -83,6 +83,9 @@ function M.watch(buf)
       if not b or #vim.fn.win_findbuf(buf) == 0 or not unsettled(b) then
         return M.unwatch(buf)
       end
+      if vim.bo[buf].busy ~= 0 then
+        return
+      end
       quiet = true
       -- Not `:edit`: that empties the buffer before anything is fetched, so
       -- every poll would be a rewrite of a log that only ever grew at the end.
