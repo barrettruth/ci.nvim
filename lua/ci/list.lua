@@ -58,14 +58,22 @@ local function paint(buf, gen, repo, summary, title, checks)
     }
     map[#lines] = c
   end
-  buf_util.set(buf, lines)
+  local existing = api.nvim_buf_get_lines(buf, 0, -1, false)
+  local keep = 0
+  while keep < #existing and keep < #lines and existing[keep + 1] == lines[keep + 1] do
+    keep = keep + 1
+  end
+
+  buf_util.set(buf, lines, keep)
   for lnum, m in pairs(marks) do
-    api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, 0, { end_col = m.sym_end, hl_group = m.hl })
-    if m.suffix_col then
-      api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, m.suffix_col, {
-        end_col = #lines[lnum],
-        hl_group = 'CiMuted',
-      })
+    if lnum > keep then
+      api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, 0, { end_col = m.sym_end, hl_group = m.hl })
+      if m.suffix_col then
+        api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, m.suffix_col, {
+          end_col = #lines[lnum],
+          hl_group = 'CiMuted',
+        })
+      end
     end
   end
   ---@type ci.BufVar
