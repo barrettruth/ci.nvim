@@ -105,6 +105,7 @@ describe('forge.host', function()
     for url, want in pairs({
       ['https://github.com/o/r.git'] = 'github.com',
       ['http://forge.example.com/o/r.git'] = 'forge.example.com',
+      ['https://forge.example.com:3000/o/r.git'] = 'forge.example.com:3000',
       ['ssh://git@forge.example.com/o/r.git'] = 'forge.example.com',
       ['ssh://git@forge.example.com:2222/o/r.git'] = 'forge.example.com',
       ['git@github.com:o/r.git'] = 'github.com',
