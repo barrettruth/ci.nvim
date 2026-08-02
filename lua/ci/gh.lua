@@ -1,5 +1,8 @@
 local M = {}
 
+local API = 10000
+local LOG = 30000
+
 --- Splits "owner/name", or yields gh's `{owner}`/`{repo}` placeholders. Those
 --- expand to the *base* repository, which is where a fork's checks live.
 ---@param repo? string
@@ -36,10 +39,15 @@ end
 
 ---@param args string[]
 ---@param on_done fun(out?: string, err?: string)
-local function run(args, on_done)
-  return vim.system(vim.list_extend({ 'gh' }, args), { text = true }, function(r)
+---@param timeout? integer
+local function run(args, on_done, timeout)
+  timeout = timeout or API
+  local opts = { text = true, timeout = timeout }
+  return vim.system(vim.list_extend({ 'gh' }, args), opts, function(r)
     vim.schedule(function()
-      if r.code ~= 0 then
+      if r.code == 124 then
+        on_done(nil, ('gh did not answer within %ds'):format(timeout / 1000))
+      elseif r.code ~= 0 then
         on_done(nil, errmsg(r))
       else
         on_done(r.stdout or '')
@@ -328,7 +336,7 @@ function M.job_log(id, repo, on_done)
       return on_done(nil, err)
     end
     on_done((out:gsub('^\239\187\191', '')))
-  end)
+  end, LOG)
 end
 
 ---@param id integer
