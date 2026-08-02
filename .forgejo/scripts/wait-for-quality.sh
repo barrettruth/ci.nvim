@@ -17,11 +17,8 @@ if [ -z "$token" ] || [ -z "$api_url" ] || [ -z "$repository" ] || [ -z "$sha" ]
 fi
 
 required_contexts='quality / Format (push)
-quality / Lint (push)'
-if grep -q '^  test:' .forgejo/workflows/quality.yaml; then
-  required_contexts="${required_contexts}
-quality / Test (push)"
-fi
+quality / Lint (push)
+quality / Test (push)'
 
 deadline="$(($(date +%s) + 3600))"
 last_pending=""
