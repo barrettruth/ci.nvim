@@ -58,10 +58,6 @@ local function paint(buf, gen, repo, summary, title, checks)
     }
     map[#lines] = c
   end
-  if #checks == 0 then
-    lines[#lines + 1] = 'No checks for this commit.'
-  end
-
   buf_util.set(buf, lines)
   for lnum, m in pairs(marks) do
     api.nvim_buf_set_extmark(buf, ansi.ns, lnum - 1, 0, { end_col = m.sym_end, hl_group = m.hl })
