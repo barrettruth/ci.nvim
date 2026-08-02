@@ -6,9 +6,11 @@ local target = require('ci.target')
 
 local M = {}
 
+local GIT = 2000
+
 ---@return string? name
 local function branch()
-  local r = vim.system({ 'git', 'rev-parse', '--abbrev-ref', 'HEAD' }, { text = true }):wait()
+  local r = vim.system({ 'git', 'rev-parse', '--abbrev-ref', 'HEAD' }, { text = true }):wait(GIT)
   if r.code ~= 0 then
     return nil
   end

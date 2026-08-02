@@ -14,6 +14,8 @@ local M = {}
 
 M.GITHUB = 'github.com'
 
+local GIT = 2000
+
 ---@param url string
 ---@return string? host
 function M.host_of(url)
@@ -32,7 +34,7 @@ end
 ---@param name string
 ---@return string? url
 local function remote(name)
-  local r = vim.system({ 'git', 'remote', 'get-url', name }, { text = true }):wait()
+  local r = vim.system({ 'git', 'remote', 'get-url', name }, { text = true }):wait(GIT)
   if r.code ~= 0 then
     return nil
   end
@@ -48,7 +50,7 @@ end
 function M.host()
   local url = remote('upstream') or remote('origin')
   if not url then
-    local r = vim.system({ 'git', 'remote' }, { text = true }):wait()
+    local r = vim.system({ 'git', 'remote' }, { text = true }):wait(GIT)
     local first = r.code == 0 and vim.split(vim.trim(r.stdout or ''), '\n')[1] or nil
     url = first and first ~= '' and remote(first) or nil
   end

@@ -4,6 +4,8 @@ local M = {}
 --- cannot be turned into the id the API answers to any other way.
 local RUN_SCAN = 100
 
+local GIT = 2000
+
 --- Forgejo ignores `limit` unless `page` is given with it, and answers with
 --- every row when it is not. Always ask for both.
 ---@param n integer
@@ -129,7 +131,9 @@ end
 ---@param expr string
 ---@return string? sha
 local function rev_parse(expr)
-  local r = vim.system({ 'git', 'rev-parse', '--verify', '--quiet', expr }, { text = true }):wait()
+  local r = vim
+    .system({ 'git', 'rev-parse', '--verify', '--quiet', expr }, { text = true })
+    :wait(GIT)
   if r.code ~= 0 then
     return nil
   end
