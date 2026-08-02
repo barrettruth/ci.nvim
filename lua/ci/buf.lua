@@ -47,6 +47,11 @@ local reported = {}
 
 local POLL = 10000
 
+local EMPTY = 6
+
+---@type table<integer, integer>
+local waits = {}
+
 --- Whether anything in {b} has yet to finish. A job says so outright; a list
 --- is asked check by check.
 ---@param b ci.BufVar
@@ -85,6 +90,14 @@ function M.watch(buf)
       end
       if vim.bo[buf].busy ~= 0 then
         return
+      end
+      if b.checks and next(b.checks) == nil then
+        waits[buf] = (waits[buf] or EMPTY) - 1
+        if waits[buf] <= 0 then
+          return M.unwatch(buf)
+        end
+      else
+        waits[buf] = nil
       end
       quiet = true
       -- Not `:edit`: that empties the buffer before anything is fetched, so
@@ -234,6 +247,7 @@ end
 ---@param buf integer
 function M.forget(buf)
   M.unwatch(buf)
+  waits[buf] = nil
   reported[buf] = nil
   settle(buf, 'success')
   views[buf] = nil
