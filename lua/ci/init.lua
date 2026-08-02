@@ -18,7 +18,8 @@ end
 
 ---@param t ci.Target
 ---@param on_uri fun(uri: string, url?: string)
-local function resolve(t, on_uri)
+---@param on_err fun(err: string)
+local function resolve(t, on_uri, on_err)
   local host = t.host or forge.host()
   local be = forge.of(host)
 
@@ -30,7 +31,7 @@ local function resolve(t, on_uri)
   local function uri(repo, kind, id, attempt)
     local slug = repo or t.repo
     if not slug or not id then
-      msg.err('could not resolve the repository for this target')
+      on_err('could not resolve the repository for this target')
       return nil
     end
     local base = ('ci://%s/%s/%s/%s'):format(host, slug, kind, id)
@@ -52,7 +53,7 @@ local function resolve(t, on_uri)
   if t.kind == 'run' and t.index and be.run_by_index then
     return be.run_by_index(t.index, t.repo, function(r, e)
       if e then
-        return msg.err(e)
+        return on_err(e)
       end
       if not t.number then
         return done(uri(t.repo, 'run', r.id), r.html_url)
@@ -60,11 +61,11 @@ local function resolve(t, on_uri)
       -- A Forgejo job URL names the job by position in its run, not by id.
       be.run_jobs(r.id, nil, t.repo, function(jobs, e2)
         if e2 then
-          return msg.err(e2)
+          return on_err(e2)
         end
         local j = jobs[t.number + 1]
         if not j then
-          return msg.err(('run %d has no job %d'):format(t.index, t.number))
+          return on_err(('run %d has no job %d'):format(t.index, t.number))
         end
         local page = require('ci.tea').job_page(r.html_url, t.number, t.attempt or j.attempt)
         done(uri(t.repo, 'job', j.id), page)
@@ -83,7 +84,7 @@ local function resolve(t, on_uri)
   if t.kind == 'workflow' then
     return be.latest_run(t.file, t.repo, function(run, e)
       if e then
-        return msg.err(e)
+        return on_err(e)
       end
       done(uri(t.repo, 'run', run.id))
     end)
@@ -93,7 +94,7 @@ local function resolve(t, on_uri)
     local expr = (t.kind == 'rev' and t.expr) or 'HEAD^{commit}'
     return be.rollup(expr, t.repo, function(res, e)
       if e then
-        return msg.err(e)
+        return on_err(e)
       end
       done(uri(res.repo or t.repo, 'checks', res.oid))
     end)
@@ -101,26 +102,26 @@ local function resolve(t, on_uri)
 
   local head = branch()
   if not head then
-    return msg.err('not in a git repository')
+    return on_err('not in a git repository')
   end
   if head == 'HEAD' then
     return be.rollup('HEAD^{commit}', nil, function(res, e)
       if e then
-        return msg.err(e)
+        return on_err(e)
       end
       done(uri(res.repo, 'checks', res.oid))
     end)
   end
   be.pr_for_branch(head, nil, function(pr, e)
     if e then
-      return msg.err(e)
+      return on_err(e)
     end
     if pr then
       return done(uri(pr.repo, 'pr', pr.number))
     end
     be.rollup(head .. '^{commit}', nil, function(res, e2)
       if e2 then
-        return msg.err(('no open pull request for %s, and %s'):format(head, e2))
+        return on_err(('no open pull request for %s, and %s'):format(head, e2))
       end
       done(uri(res.repo, 'checks', res.oid))
     end)
@@ -163,6 +164,11 @@ function M.run(arg, mods)
     if url then
       vim.b[0].ci = vim.tbl_extend('force', vim.b[0].ci or {}, { url = url })
     end
+  end, function(e)
+    if report then
+      report('failed')
+    end
+    msg.err(e)
   end)
 end
 
