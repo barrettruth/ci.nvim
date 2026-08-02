@@ -17,11 +17,15 @@ M.GITHUB = 'github.com'
 ---@param url string
 ---@return string? host
 function M.host_of(url)
-  local authority = url:match('^%a[%w+.%-]*://([^/]+)') or url:match('^([^/]+):')
+  local scheme, authority = url:match('^(%a[%w+.%-]*)://([^/]+)')
+  authority = authority or url:match('^([^/]+):')
   if not authority then
     return nil
   end
   authority = authority:gsub('^[^@]*@', '')
+  if scheme == 'http' or scheme == 'https' then
+    return authority
+  end
   return (authority:gsub(':%d+$', ''))
 end
 
