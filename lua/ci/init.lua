@@ -164,11 +164,11 @@ function M.run(arg, mods)
     if url then
       vim.b[0].ci = vim.tbl_extend('force', vim.b[0].ci or {}, { url = url })
     end
-  end, function(e)
+  end, function(err)
     if report then
       report('failed')
     end
-    msg.err(e)
+    msg.err(err)
   end)
 end
 
