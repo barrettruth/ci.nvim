@@ -2,6 +2,23 @@ local M = {}
 
 local API = 10000
 local LOG = 30000
+local VERSION = 2000
+
+--- gh 2.97 stopped printing a response that carries terminal escape sequences
+--- unless asked to, and a job's log is nothing but. Older gh has no such flag
+--- to give, so which one is installed decides whether it is passed.
+---@type boolean?
+local escapes_supported
+
+---@return boolean
+local function escapes_allowed()
+  if escapes_supported == nil then
+    local r = vim.system({ 'gh', '--version' }, { text = true }):wait(VERSION)
+    local v = vim.version.parse(r.stdout or '', { strict = false })
+    escapes_supported = v ~= nil and vim.version.ge(v, { 2, 97, 0 })
+  end
+  return escapes_supported
+end
 
 --- Splits "owner/name", or yields gh's `{owner}`/`{repo}` placeholders. Those
 --- expand to the *base* repository, which is where a fork's checks live.
@@ -331,7 +348,11 @@ end
 ---@param repo? string
 ---@param on_done fun(text?: string, err?: string)
 function M.job_log(id, repo, on_done)
-  return run({ 'api', ('repos/%s/actions/jobs/%d/logs'):format(slug(repo), id) }, function(out, err)
+  local args = { 'api', ('repos/%s/actions/jobs/%d/logs'):format(slug(repo), id) }
+  if escapes_allowed() then
+    args[#args + 1] = '--allow-escape-sequences'
+  end
+  return run(args, function(out, err)
     if err then
       return on_done(nil, err)
     end
