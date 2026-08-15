@@ -131,7 +131,7 @@ vim.api.nvim_create_autocmd({ 'BufWinEnter', 'BufReadPost' }, {
       vim.wo[0][0].foldexpr = 'v:lua.require("ci.log").fold(v:lnum)'
       -- A poll reloads the buffer, which lands here again. Closing every fold
       -- belongs to the first sight of a log, not to every refresh of one.
-      if not vim.b[args.buf].ci_loaded then
+      if not vim.tbl_get(vim.b[args.buf], 'ci', 'loaded') then
         vim.wo[0][0].foldlevel = 0
       end
       vim.wo[0][0].conceallevel = 3

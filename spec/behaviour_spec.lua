@@ -144,7 +144,7 @@ describe('the timestamp column', function()
     end)
     vim.wait(50)
     assert.same(4, marks(b))
-    assert.is_true(vim.b[b].ci_times)
+    assert.is_true(vim.b[b].ci.times)
 
     require('ci.log').timestamps()
     assert.same(0, marks(b))
