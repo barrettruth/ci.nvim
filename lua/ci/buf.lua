@@ -23,6 +23,9 @@ local M = {}
 ---@field up? string
 ---@field checks? ci.Check[]
 ---@field pending? boolean
+---@field gen integer
+---@field loaded? boolean
+---@field times? boolean
 
 local KINDS = { job = true, run = true, checks = true, pr = true }
 
@@ -169,7 +172,7 @@ end
 ---@param gen integer
 ---@return boolean
 function M.current(buf, gen)
-  return api.nvim_buf_is_valid(buf) and vim.b[buf].ci_gen == gen
+  return api.nvim_buf_is_valid(buf) and vim.tbl_get(vim.b[buf], 'ci', 'gen') == gen
 end
 
 --- Replaces the buffer from {from} on, leaving everything before it and the
@@ -374,6 +377,7 @@ function M.load(buf, uri)
 
   ---@type ci.BufVar?
   local prev = vim.b[buf].ci
+  local gen = (prev and prev.gen or 0) + 1
 
   -- What a reload cannot rediscover is carried over: a Forgejo job knows its
   -- name only from the list it was opened from, and a poll would blank it.
@@ -385,12 +389,13 @@ function M.load(buf, uri)
     repo = u.repo,
     workflow = prev and prev.workflow or '',
     url = prev and prev.url or '',
+    gen = gen,
+    loaded = prev and prev.loaded or nil,
+    times = prev and prev.times or nil,
   }
 
   keymaps(buf, u.kind == 'job' and 'job' or 'list', require('ci.forge').is_github(u.host))
 
-  local gen = (vim.b[buf].ci_gen or 0) + 1
-  vim.b[buf].ci_gen = gen
   vim.bo[buf].busy = 1
   settle(buf, 'success')
   if not quiet then

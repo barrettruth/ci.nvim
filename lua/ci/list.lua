@@ -83,8 +83,8 @@ local function paint(buf, gen, repo, summary, title, checks)
     title = title,
     checks = map,
     pending = #checks == 0,
+    loaded = true,
   })
-  vim.b[buf].ci_loaded = true
   buf_util.watch(buf)
 end
 

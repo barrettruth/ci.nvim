@@ -53,7 +53,7 @@ local function times(buf, on)
       })
     end
   end
-  vim.b[buf].ci_times = on
+  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { times = on })
 end
 
 --- "2026-07-27T15:14:08" -> "Mon, 27 Jul 2026 15:14:08 GMT". The weekday needs
@@ -473,8 +473,7 @@ local function steplist(buf, job)
   end
   -- A step is not a check, so it is not offered to <CR>; the flag is only
   -- here to tell the poll this buffer has not finished.
-  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true })
-  vim.b[buf].ci_loaded = true
+  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true, loaded = true })
   buf_util.watch(buf)
 end
 
@@ -486,8 +485,8 @@ function M.render(buf, gen, u)
   if not id then
     return buf_util.fail(buf, ('malformed job id: %s'):format(u.id))
   end
-  local reload = vim.b[buf].ci_loaded
-  local showing = vim.b[buf].ci_times
+  local reload = vim.b[buf].ci.loaded
+  local showing = vim.b[buf].ci.times
   times(buf, false)
 
   ---@type ci.gh.Job?, string?, string?, boolean?
@@ -515,7 +514,7 @@ function M.render(buf, gen, u)
       buf_util.watch(buf)
     end
     paint(buf, gen, rows, function(following)
-      vim.b[buf].ci_loaded = true
+      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { loaded = true })
       times(buf, showing or false)
       -- A log still being written is read at its end, so it is left open and
       -- the cursor rides the last line for anyone already sitting there.
@@ -637,7 +636,7 @@ end
 function M.timestamps()
   local buf = api.nvim_get_current_buf()
   if stamps[buf] then
-    times(buf, not vim.b[buf].ci_times)
+    times(buf, not vim.b[buf].ci.times)
   end
 end
 
