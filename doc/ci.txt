@@ -140,6 +140,13 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
     [[      <Plug>(ci-prev-step)   In a job log, go to the previous step.
                                    Unmapped on Forgejo, which has no steps.
     gS      <Plug>(ci-timestamps)  In a job log, toggle the timestamps.
+    cr      <Plug>(ci-rerun)       Re-run the run under the cursor: the
+                                   jobs of it that did not pass, or all of
+                                   them if they all did. Confirms first.
+                                   GitHub only.
+    cc      <Plug>(ci-cancel)      Cancel the run under the cursor. Again,
+                                   while it is still cancelling, forces it.
+                                   Confirms first. GitHub only.
     gX      <Plug>(ci-web)         Open the current buffer in a browser.
     g?      <Plug>(ci-help)        This section.
 
@@ -196,6 +203,9 @@ behaviors missing
 Firstly, Forgejo will not say where one step of a job ends and the next
 begins. Resultedly, a job log folds on `##[group]` alone. Step folds, step
 headers, and `[[`/`]]` are GitHub-only.
+
+Forgejo has no rerun endpoint at all, so `cr` and `cc` are unmapped there. It
+can cancel a run, but the `tea` verb named for it deletes one.
 
 Forgejo 16.0+ also lacks fetching individual jobs and does not resolve
 revisions remotely. Therefore, `:CI {rev}` only sees what you've fetched.

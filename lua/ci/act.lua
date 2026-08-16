@@ -1,0 +1,283 @@
+local buf_util = require('ci.buf')
+local gh = require('ci.gh')
+local msg = require('ci.msg')
+
+local api = vim.api
+
+local M = {}
+
+--- Conclusions github will not retry. Everything else it will, `cancelled`
+--- included — which `status.bucket` files under `skipped`, so the test here is
+--- on the conclusion rather than on the bucket.
+local PASSED = { success = true, skipped = true, neutral = true }
+
+--- Runs already asked to stop this session, so a second `cc` escalates instead
+--- of repeating itself. Keyed on the run rather than the buffer, because a
+--- checks list shows several rows of one run.
+---@type table<integer, boolean>
+local asked = {}
+
+--- Buffers with a question or a request outstanding. The default
+--- |vim.ui.input()| blocks and could not stack two, but an overridden one can,
+--- and two prompts over one run is nobody's idea of a confirmation.
+---@type table<integer, boolean>
+local busy = {}
+
+---@class ci.act.Target
+---@field run integer
+---@field repo string
+---@field host string
+---@field label string the workflow, when the view names one
+---@field rows? ci.Check[] what the view shows of this run
+
+--- What the two keys act on, or the reason they cannot.
+---
+--- Read once, at the keypress: the question is a callback, and a list re-sorts
+--- itself worst-first on every poll, so the row under the cursor is not
+--- necessarily the row that gets confirmed.
+---@param u ci.Uri
+---@param b ci.BufVar
+---@param lnum integer
+---@return ci.act.Target?
+---@return string? refusal
+function M.target(u, b, lnum)
+  if u.kind == 'job' then
+    if not b.run_id then
+      return nil, 'this job does not name a run'
+    end
+    return { run = b.run_id, repo = u.repo, host = u.host, label = b.workflow or '' }
+  end
+
+  ---@type ci.Check[]
+  local rows = {}
+
+  if u.kind == 'run' then
+    -- An attempt pins the view to a run that has moved on: github answers for
+    -- it with the old attempt's state and the live run's rerun_url, so acting
+    -- here would change something other than what is on the screen.
+    if u.attempt then
+      return nil, ('this is attempt %d of run %s; open the run itself'):format(u.attempt, u.id)
+    end
+    local run = tonumber(u.id)
+    if not run then
+      return nil, ('malformed run id: %s'):format(u.id)
+    end
+    for _, c in pairs(b.checks or {}) do
+      rows[#rows + 1] = c
+    end
+    return {
+      run = run,
+      repo = u.repo,
+      host = u.host,
+      label = rows[1] and rows[1].workflow or '',
+      rows = rows,
+    }
+  end
+
+  local check = (b.checks or {})[lnum]
+  if not check then
+    return nil, 'no check on this line'
+  end
+  -- Gated on the run and never on the job: a check posted by an app carries a
+  -- databaseId of its own and belongs to no Actions run at all.
+  if not check.run_id then
+    return nil, ('no Actions run for %s'):format(check.name or 'this check')
+  end
+  for _, c in pairs(b.checks or {}) do
+    if c.run_id == check.run_id then
+      rows[#rows + 1] = c
+    end
+  end
+  return {
+    run = check.run_id,
+    repo = u.repo,
+    host = u.host,
+    label = check.workflow or '',
+    rows = rows,
+  }
+end
+
+--- Which rerun github will take for {rows}, and how many jobs that names.
+---@param rows ci.Check[]
+---@return ci.gh.Act what
+---@return integer count
+function M.scope(rows)
+  local failed = 0
+  for _, c in ipairs(rows) do
+    local concl = (c.conclusion or ''):lower()
+    if concl ~= '' and not PASSED[concl] then
+      failed = failed + 1
+    end
+  end
+  if failed > 0 then
+    return 'rerun-failed-jobs', failed
+  end
+  return 'rerun', #rows
+end
+
+--- The set github is about to be asked for, in English: "1 job", "all 9 jobs",
+--- "3 failed jobs".
+---@param n integer
+---@param failed boolean
+---@return string
+local function jobs(n, failed)
+  if failed then
+    return n == 1 and '1 failed job' or ('%d failed jobs'):format(n)
+  end
+  return n == 1 and '1 job' or ('all %d jobs'):format(n)
+end
+
+--- " (build)", or nothing when the view cannot name the workflow.
+---@param t ci.act.Target
+---@return string
+local function tag(t)
+  return t.label ~= '' and (' (%s)'):format(t.label) or ''
+end
+
+--- Neovim's own y/N, as `nvim/spellfile.lua` spells it: anything but "y" is
+--- no, and the question is wiped rather than left on the message line.
+---@param prompt string
+---@param yes fun()
+---@param no fun()
+local function confirm(prompt, yes, no)
+  vim.ui.input({ prompt = prompt, scope = 'editor' }, function(input)
+    api.nvim_echo({ { ' ' } }, false, { kind = 'empty' })
+    if input and input:lower() == 'y' then
+      return yes()
+    end
+    no()
+  end)
+end
+
+--- Where a rerun leaves you. Every attempt re-mints every job id, so the log
+--- that asked for one is a record of the attempt it was opened at from here
+--- on; the new job appears in the run, which is where github.com goes too.
+---@param buf integer
+---@param t ci.act.Target
+---@param what ci.gh.Act
+---@param win integer
+local function after(buf, t, what, win)
+  if not api.nvim_buf_is_valid(buf) then
+    return
+  end
+  local u = buf_util.parse(api.nvim_buf_get_name(buf))
+  local rerun = what == 'rerun' or what == 'rerun-failed-jobs'
+  if u and u.kind == 'job' and rerun and api.nvim_win_get_buf(win) == buf then
+    return api.nvim_win_call(win, function()
+      buf_util.open(('ci://%s/%s/run/%d'):format(u.host, u.repo, t.run), { keepalt = true })
+      buf_util.nudge(api.nvim_get_current_buf())
+    end)
+  end
+  buf_util.nudge(buf)
+  buf_util.reload(buf)
+end
+
+---@param buf integer
+---@param t ci.act.Target
+---@param what ci.gh.Act
+---@param doing string
+local function send(buf, t, what, doing)
+  local report = msg.progress(doing)
+  -- Which window the answer lands in is settled before the round trip: by the
+  -- time one comes back the current window is wherever you wandered to.
+  local win = api.nvim_get_current_win()
+  gh.act(t.run, what, t.repo, function(err)
+    busy[buf] = nil
+    if err then
+      report('failed')
+      return msg.err(err)
+    end
+    report('success')
+    asked[t.run] = (what == 'cancel' or what == 'force-cancel') or nil
+    if api.nvim_win_is_valid(win) then
+      after(buf, t, what, win)
+    end
+  end)
+end
+
+--- The buffer and what it acts on, once. Refusals are reported here, so a nil
+--- buffer means the reader has already been told why.
+---@return integer? buf
+---@return ci.act.Target?
+local function start()
+  local buf = api.nvim_get_current_buf()
+  local u = buf_util.parse(api.nvim_buf_get_name(buf))
+  ---@type ci.BufVar?
+  local b = vim.b[buf].ci
+  if not u or not b or busy[buf] then
+    return nil
+  end
+  local t, refusal = M.target(u, b, api.nvim_win_get_cursor(0)[1])
+  if not t then
+    if refusal then
+      msg.warn(refusal)
+    end
+    return nil
+  end
+  busy[buf] = true
+  return buf, t
+end
+
+---@param buf integer
+---@param t ci.act.Target
+local function offer(buf, t)
+  local what, n = M.scope(t.rows or {})
+  local prompt = n > 0
+      and ('Re-run %s in run %d%s? [y/N] '):format(
+        jobs(n, what == 'rerun-failed-jobs'),
+        t.run,
+        tag(t)
+      )
+    or ('Re-run run %d%s? [y/N] '):format(t.run, tag(t))
+  confirm(prompt, function()
+    send(buf, t, what, ('Re-running run %d'):format(t.run))
+  end, function()
+    busy[buf] = nil
+  end)
+end
+
+--- Re-runs the run under the cursor: the jobs of it that did not pass, or all
+--- of them when they all did.
+function M.rerun()
+  local buf, t = start()
+  if not buf or not t then
+    return
+  end
+  if t.rows then
+    return offer(buf, t)
+  end
+  -- A log sees one job. What else is in the run comes from the request the run
+  -- view already draws itself with, so the question can name a count there too.
+  gh.run_jobs(t.run, nil, t.repo, function(found, err)
+    if err or not found then
+      busy[buf] = nil
+      return msg.err(err or ('no jobs in run %d'):format(t.run))
+    end
+    t.rows = vim.tbl_map(function(j)
+      ---@type ci.Check
+      return { name = j.name, status = j.status, conclusion = j.conclusion }
+    end, found)
+    offer(buf, t)
+  end)
+end
+
+--- Cancels the run under the cursor, and forces it if it is already being
+--- asked. github takes a second cancel without complaint, so the escalation
+--- replaces the gentle one rather than sitting beside it.
+function M.cancel()
+  local buf, t = start()
+  if not buf or not t then
+    return
+  end
+  local force = asked[t.run] or false
+  local prompt = force
+      and ('Run %d%s is still cancelling. Force cancel? [y/N] '):format(t.run, tag(t))
+    or ('Cancel run %d%s? [y/N] '):format(t.run, tag(t))
+  confirm(prompt, function()
+    send(buf, t, force and 'force-cancel' or 'cancel', ('Cancelling run %d'):format(t.run))
+  end, function()
+    busy[buf] = nil
+  end)
+end
+
+return M

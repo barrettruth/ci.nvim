@@ -385,6 +385,25 @@ function M.run_jobs(id, attempt, repo, on_done)
   end)
 end
 
+---@alias ci.gh.Act 'rerun'|'rerun-failed-jobs'|'cancel'|'force-cancel'
+
+--- Asks github to change a workflow run.
+---
+--- REST only: the whole GraphQL schema carries no Actions mutation but the
+--- check-suite ones, and none of them reruns or cancels. Nothing is decoded
+--- either, since these answer `{}` or an empty body depending on the endpoint
+--- and `api()` would call the empty one malformed. Exit 0 is the whole answer.
+---@param id integer
+---@param what ci.gh.Act
+---@param repo? string
+---@param on_done fun(err?: string)
+function M.act(id, what, repo, on_done)
+  local path = ('repos/%s/actions/runs/%d/%s'):format(slug(repo), id, what)
+  return run({ 'api', '--method', 'POST', path }, function(_, err)
+    on_done(err)
+  end)
+end
+
 ---@class ci.gh.WorkflowRun
 ---@field id integer
 

@@ -21,6 +21,7 @@ local M = {}
 ---@field workflow string
 ---@field url string
 ---@field up? string
+---@field run_id? integer the run a job belongs to
 ---@field checks? ci.Check[]
 ---@field pending? boolean
 ---@field gen integer
@@ -52,14 +53,26 @@ local POLL = 10000
 
 local EMPTY = 6
 
+--- How long a buffer keeps polling after it was acted on, whatever it looks
+--- like. A rerun leaves a settled buffer whose timer has already stopped, and
+--- a cancel takes about twenty seconds to show.
+local NUDGE = 30000
+
 ---@type table<integer, integer>
 local waits = {}
 
+---@type table<integer, integer>
+local nudged = {}
+
 --- Whether anything in {b} has yet to finish. A job says so outright; a list
 --- is asked check by check.
+---@param buf integer
 ---@param b ci.BufVar
 ---@return boolean
-local function unsettled(b)
+local function unsettled(buf, b)
+  if (nudged[buf] or 0) > vim.uv.now() then
+    return true
+  end
   if b.pending then
     return true
   end
@@ -88,7 +101,7 @@ function M.watch(buf)
     vim.schedule_wrap(function()
       ---@type ci.BufVar?
       local b = api.nvim_buf_is_valid(buf) and vim.b[buf].ci or nil
-      if not b or #vim.fn.win_findbuf(buf) == 0 or not unsettled(b) then
+      if not b or #vim.fn.win_findbuf(buf) == 0 or not unsettled(buf, b) then
         return M.unwatch(buf)
       end
       if vim.bo[buf].busy ~= 0 then
@@ -102,18 +115,35 @@ function M.watch(buf)
       else
         waits[buf] = nil
       end
-      quiet = true
-      -- Not `:edit`: that empties the buffer before anything is fetched, so
-      -- every poll would be a rewrite of a log that only ever grew at the end.
-      -- Rendering straight into the buffer leaves the old lines, and the
-      -- extmarks and folds over them, in place until there is more to add.
-      local ok = pcall(M.load, buf, api.nvim_buf_get_name(buf))
-      quiet = false
-      if not ok then
+      if not M.reload(buf) then
         M.unwatch(buf)
       end
     end)
   )
+end
+
+--- Reloads {buf} where it stands, without the progress message a hand-asked
+--- reload prints: the reader asked once, and a line every ten seconds would be
+--- worse than none.
+---@param buf integer
+---@return boolean ok
+function M.reload(buf)
+  quiet = true
+  -- Not `:edit`: that empties the buffer before anything is fetched, so every
+  -- poll would be a rewrite of a log that only ever grew at the end. Rendering
+  -- straight into the buffer leaves the old lines, and the extmarks and folds
+  -- over them, in place until there is more to add.
+  local ok = pcall(M.load, buf, api.nvim_buf_get_name(buf))
+  quiet = false
+  return ok
+end
+
+--- Keeps {buf} polling for a while whatever it looks like. A buffer that has
+--- just been acted on has a change coming that it cannot see yet.
+---@param buf integer
+function M.nudge(buf)
+  nudged[buf] = vim.uv.now() + NUDGE
+  M.watch(buf)
 end
 
 ---@param buf integer
@@ -251,6 +281,7 @@ end
 function M.forget(buf)
   M.unwatch(buf)
   waits[buf] = nil
+  nudged[buf] = nil
   reported[buf] = nil
   settle(buf, 'success')
   views[buf] = nil
@@ -277,15 +308,20 @@ end
 
 ---@param buf integer
 ---@param kind 'job'|'list'
----@param steps boolean whether the forge exposes step boundaries
-local function keymaps(buf, kind, steps)
+---@param github boolean whether the forge is github, which alone exposes step
+--- boundaries and alone can be asked to rerun or cancel
+local function keymaps(buf, kind, github)
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
     map(buf, '-', 'up', 'Go back to the list you came from')
     map(buf, 'R', 'refresh', 'Reload this buffer')
     map(buf, 'gX', 'web', 'Open in the browser')
+    if github then
+      map(buf, 'cr', 'rerun', 'Re-run this workflow run')
+      map(buf, 'cc', 'cancel', 'Cancel this workflow run')
+    end
     if kind == 'job' then
-      if steps then
+      if github then
         map(buf, ']]', 'next-step', 'Go to the next step')
         map(buf, '[[', 'prev-step', 'Go to the previous step')
       end
@@ -389,6 +425,7 @@ function M.load(buf, uri)
     repo = u.repo,
     workflow = prev and prev.workflow or '',
     url = prev and prev.url or '',
+    run_id = prev and prev.run_id or nil,
     gen = gen,
     loaded = prev and prev.loaded or nil,
     times = prev and prev.times or nil,

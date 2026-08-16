@@ -574,6 +574,7 @@ function M.render(buf, gen, u)
           or kept(prev.status, status.paint(hl, sym)),
         workflow = kept(job.workflow_name, prev.workflow),
         url = kept(job.html_url, prev.url),
+        run_id = job.run_id or prev.run_id,
         up = vim.b[buf].ci.up
           or (job.head_sha and ('ci://%s/%s/checks/%s'):format(u.host, u.repo, job.head_sha) or nil),
       })
