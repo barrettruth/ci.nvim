@@ -129,10 +129,8 @@ MAPPINGS                                                         *ci-mappings*
 Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
 
     <CR>    <Plug>(ci-open)        In a checks list, open the check under
-                                   the cursor. A check still running opens
-                                   `gh run watch` in a |terminal| instead.
-                                   Checks that are not Actions jobs open in
-                                   a browser.
+                                   the cursor. Checks that are not Actions
+                                   jobs open in a browser.
     -       <Plug>(ci-up)          Go back to the list you came from.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
     ]]      <Plug>(ci-next-step)   In a job log, go to the next step.
