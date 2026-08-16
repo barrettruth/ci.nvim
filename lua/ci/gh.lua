@@ -37,17 +37,26 @@ local function slug(repo)
   return o .. '/' .. n
 end
 
+--- What github said, if {s} is one of its error envelopes.
+---@param s string
+---@return string?
+local function said(s)
+  local ok, decoded = pcall(vim.json.decode, s)
+  if ok and type(decoded) == 'table' and type(decoded.message) == 'string' then
+    return decoded.message
+  end
+  return nil
+end
+
+--- `gh api` writes github's response to stdout and its own "gh: … (HTTP 403)"
+--- line to stderr, so the body is read first. github refuses in whole
+--- sentences — "This workflow is already running", "Only jobs from the current
+--- attempt can be re-run" — and gh's line only repeats one behind a prefix.
 ---@param r vim.SystemCompleted
 ---@return string
 local function errmsg(r)
-  local s = vim.trim(r.stderr or '')
-  if s == '' then
-    s = vim.trim(r.stdout or '')
-  end
-  local ok, decoded = pcall(vim.json.decode, s)
-  if ok and type(decoded) == 'table' and decoded.message then
-    s = decoded.message
-  end
+  local out, err = vim.trim(r.stdout or ''), vim.trim(r.stderr or '')
+  local s = said(out) or said(err) or (err ~= '' and err or out)
   if s == '' then
     s = ('gh exited with code %d'):format(r.code)
   end
