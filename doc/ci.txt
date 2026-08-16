@@ -202,8 +202,8 @@ Firstly, Forgejo will not say where one step of a job ends and the next
 begins. Resultedly, a job log folds on `##[group]` alone. Step folds, step
 headers, and `[[`/`]]` are GitHub-only.
 
-Forgejo has no rerun endpoint at all, so `cr` and `cc` are unmapped there. It
-can cancel a run, but the `tea` verb named for it deletes one.
+Re-running and cancelling are GitHub-only. `cr` and `cc` are unmapped on
+Forgejo.
 
 Forgejo 16.0+ also lacks fetching individual jobs and does not resolve
 revisions remotely. Therefore, `:CI {rev}` only sees what you've fetched.

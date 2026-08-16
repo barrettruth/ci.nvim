@@ -71,7 +71,7 @@ under the cursor, `-` goes back to the list you came from, `cr` re-runs and
 ## Known limitations
 
 - **In-progress jobs (GitHub)**: gh [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their step status only, until completion.
-- **Re-run and cancel (Forgejo)**: `cr` and `cc` are GitHub-only and unmapped elsewhere. Forgejo's API has no rerun endpoint at all; it can cancel a run, but `tea actions runs cancel` is an alias for deleting one.
+- **Re-run and cancel (Forgejo)**: not supported. `cr` and `cc` are GitHub-only.
 - **Steps (Forgejo)**: no step names, step folds, or `[[`/`]]`. The boundaries exist in Forgejo's database but are not served by its API.
 - **Revisions (Forgejo)**: resolved with local `git rev-parse`, not by the server, so `:CI master` is your last fetch (may differ from the remote's ref).
 - **Forks (Forgejo)**: `tea` resolves by remote name, preferring `upstream` over `origin`, rather than by asking the forge which repository is the base. A fork whose parent is not named `upstream` is queried as itself, and an `upstream` on a different forge is looked up on the wrong host.
