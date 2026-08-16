@@ -49,9 +49,8 @@ local function said(s)
 end
 
 --- `gh api` writes github's response to stdout and its own "gh: … (HTTP 403)"
---- line to stderr, so the body is read first. github refuses in whole
---- sentences — "This workflow is already running", "Only jobs from the current
---- attempt can be re-run" — and gh's line only repeats one behind a prefix.
+--- line to stderr, so the body is read first: it is the same sentence without
+--- the prefix.
 ---@param r vim.SystemCompleted
 ---@return string
 local function errmsg(r)
@@ -387,12 +386,9 @@ end
 
 ---@alias ci.gh.Act 'rerun'|'rerun-failed-jobs'|'cancel'|'force-cancel'
 
---- Asks github to change a workflow run.
----
---- REST only: the whole GraphQL schema carries no Actions mutation but the
---- check-suite ones, and none of them reruns or cancels. Nothing is decoded
---- either, since these answer `{}` or an empty body depending on the endpoint
---- and `api()` would call the empty one malformed. Exit 0 is the whole answer.
+--- Asks github to change a workflow run. REST only, the GraphQL schema having
+--- no Actions mutation but the check-suite ones. Nothing is decoded: these
+--- answer `{}` or an empty body, which `api()` would call malformed.
 ---@param id integer
 ---@param what ci.gh.Act
 ---@param repo? string

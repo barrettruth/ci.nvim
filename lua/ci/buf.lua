@@ -53,9 +53,8 @@ local POLL = 10000
 
 local EMPTY = 6
 
---- How long a buffer keeps polling after it was acted on, whatever it looks
---- like. A rerun leaves a settled buffer whose timer has already stopped, and
---- a cancel takes about twenty seconds to show.
+--- How long a buffer polls after it was acted on. A rerun leaves it settled
+--- and stopped, and a cancel takes some twenty seconds to show.
 local NUDGE = 30000
 
 ---@type table<integer, integer>
@@ -122,24 +121,18 @@ function M.watch(buf)
   )
 end
 
---- Reloads {buf} where it stands, without the progress message a hand-asked
---- reload prints: the reader asked once, and a line every ten seconds would be
---- worse than none.
+--- Renders over {buf} where it stands, keeping the lines and the extmarks and
+--- folds over them until there is more to add. Silent: the reader asked once.
 ---@param buf integer
 ---@return boolean ok
 function M.reload(buf)
   quiet = true
-  -- Not `:edit`: that empties the buffer before anything is fetched, so every
-  -- poll would be a rewrite of a log that only ever grew at the end. Rendering
-  -- straight into the buffer leaves the old lines, and the extmarks and folds
-  -- over them, in place until there is more to add.
   local ok = pcall(M.load, buf, api.nvim_buf_get_name(buf))
   quiet = false
   return ok
 end
 
---- Keeps {buf} polling for a while whatever it looks like. A buffer that has
---- just been acted on has a change coming that it cannot see yet.
+--- Keeps {buf} polling for a while whatever it looks like.
 ---@param buf integer
 function M.nudge(buf)
   nudged[buf] = vim.uv.now() + NUDGE
@@ -308,8 +301,8 @@ end
 
 ---@param buf integer
 ---@param kind 'job'|'list'
----@param github boolean whether the forge is github, which alone exposes step
---- boundaries and alone can be asked to rerun or cancel
+---@param github boolean github alone exposes step boundaries, and github alone
+--- can be asked to rerun or cancel
 local function keymaps(buf, kind, github)
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })

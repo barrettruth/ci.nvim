@@ -6,20 +6,17 @@ local api = vim.api
 
 local M = {}
 
---- Conclusions github will not retry. Everything else it will, `cancelled`
---- included — which `status.bucket` files under `skipped`, so the test here is
---- on the conclusion rather than on the bucket.
+--- Conclusions github will not retry. `cancelled` is not among them, and
+--- `status.bucket` files it under `skipped`, so the test is on the conclusion.
 local PASSED = { success = true, skipped = true, neutral = true }
 
---- Runs already asked to stop this session, so a second `cc` escalates instead
---- of repeating itself. Keyed on the run rather than the buffer, because a
---- checks list shows several rows of one run.
+--- Runs already asked to stop this session, so a second `cc` escalates. Keyed
+--- on the run: a checks list shows several rows of one.
 ---@type table<integer, boolean>
 local asked = {}
 
---- Buffers with a question or a request outstanding. The default
---- |vim.ui.input()| blocks and could not stack two, but an overridden one can,
---- and two prompts over one run is nobody's idea of a confirmation.
+--- Buffers with a question or a request outstanding. An overridden
+--- |vim.ui.input()| does not block, so two can stack.
 ---@type table<integer, boolean>
 local busy = {}
 
@@ -30,11 +27,9 @@ local busy = {}
 ---@field label string the workflow, when the view names one
 ---@field rows? ci.Check[] what the view shows of this run
 
---- What the two keys act on, or the reason they cannot.
----
---- Read once, at the keypress: the question is a callback, and a list re-sorts
---- itself worst-first on every poll, so the row under the cursor is not
---- necessarily the row that gets confirmed.
+--- What the two keys act on, or the reason they cannot. Read at the keypress,
+--- because a list re-sorts itself worst-first on every poll and the question
+--- that follows is a callback.
 ---@param u ci.Uri
 ---@param b ci.BufVar
 ---@param lnum integer
@@ -52,9 +47,8 @@ function M.target(u, b, lnum)
   local rows = {}
 
   if u.kind == 'run' then
-    -- An attempt pins the view to a run that has moved on: github answers for
-    -- it with the old attempt's state and the live run's rerun_url, so acting
-    -- here would change something other than what is on the screen.
+    -- A pinned attempt answers with its own state and the live run's
+    -- rerun_url, so acting here would change something else.
     if u.attempt then
       return nil, ('this is attempt %d of run %s; open the run itself'):format(u.attempt, u.id)
     end
@@ -78,8 +72,8 @@ function M.target(u, b, lnum)
   if not check then
     return nil, 'no check on this line'
   end
-  -- Gated on the run and never on the job: a check posted by an app carries a
-  -- databaseId of its own and belongs to no Actions run at all.
+  -- The run, never the job: a check posted by an app has a databaseId of its
+  -- own and no Actions run behind it.
   if not check.run_id then
     return nil, ('no Actions run for %s'):format(check.name or 'this check')
   end
@@ -115,8 +109,7 @@ function M.scope(rows)
   return 'rerun', #rows
 end
 
---- The set github is about to be asked for, in English: "1 job", "all 9 jobs",
---- "3 failed jobs".
+--- "1 job", "all 9 jobs", "3 failed jobs".
 ---@param n integer
 ---@param failed boolean
 ---@return string
@@ -134,8 +127,7 @@ local function tag(t)
   return t.label ~= '' and (' (%s)'):format(t.label) or ''
 end
 
---- Neovim's own y/N, as `nvim/spellfile.lua` spells it: anything but "y" is
---- no, and the question is wiped rather than left on the message line.
+--- Neovim's own y/N, as `nvim/spellfile.lua` spells it.
 ---@param prompt string
 ---@param yes fun()
 ---@param no fun()
@@ -149,9 +141,8 @@ local function confirm(prompt, yes, no)
   end)
 end
 
---- Where a rerun leaves you. Every attempt re-mints every job id, so the log
---- that asked for one is a record of the attempt it was opened at from here
---- on; the new job appears in the run, which is where github.com goes too.
+--- Where a rerun leaves you. Every attempt re-mints every job id, so a log is
+--- a record of its attempt from here on and the new job is in the run.
 ---@param buf integer
 ---@param t ci.act.Target
 ---@param what ci.gh.Act
@@ -178,8 +169,8 @@ end
 ---@param doing string
 local function send(buf, t, what, doing)
   local report = msg.progress(doing)
-  -- Which window the answer lands in is settled before the round trip: by the
-  -- time one comes back the current window is wherever you wandered to.
+  -- By the time an answer comes back the current window is wherever you
+  -- wandered to.
   local win = api.nvim_get_current_win()
   gh.act(t.run, what, t.repo, function(err)
     busy[buf] = nil
@@ -195,8 +186,7 @@ local function send(buf, t, what, doing)
   end)
 end
 
---- The buffer and what it acts on, once. Refusals are reported here, so a nil
---- buffer means the reader has already been told why.
+--- The buffer and what it acts on. A nil buffer has already been explained.
 ---@return integer? buf
 ---@return ci.act.Target?
 local function start()
@@ -246,8 +236,8 @@ function M.rerun()
   if t.rows then
     return offer(buf, t)
   end
-  -- A log sees one job. What else is in the run comes from the request the run
-  -- view already draws itself with, so the question can name a count there too.
+  -- A log sees one job, so the rest of the run is asked for before the
+  -- question can name a scope.
   gh.run_jobs(t.run, nil, t.repo, function(found, err)
     if err or not found then
       busy[buf] = nil
@@ -261,9 +251,7 @@ function M.rerun()
   end)
 end
 
---- Cancels the run under the cursor, and forces it if it is already being
---- asked. github takes a second cancel without complaint, so the escalation
---- replaces the gentle one rather than sitting beside it.
+--- Cancels the run under the cursor, forcing it if one was already asked for.
 function M.cancel()
   local buf, t = start()
   if not buf or not t then
