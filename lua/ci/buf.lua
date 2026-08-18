@@ -176,15 +176,26 @@ function M.parse(uri)
   if not body then
     return nil
   end
-  local host, owner, name, kind, rest = body:match('^([^/]+)/([^/]+)/([^/]+)/([^/]+)/(.+)$')
-  if not owner or not KINDS[kind] then
+  local seg = vim.split(body, '/', { plain = true })
+  -- A repository path is whatever lies between the host and the kind: two
+  -- segments on github, more under a gitlab subgroup. The rightmost kind wins,
+  -- so a repository may be named after one.
+  local at
+  for i = #seg - 1, 3, -1 do
+    if KINDS[seg[i]] then
+      at = i
+      break
+    end
+  end
+  if not at then
     return nil
   end
+  local rest = table.concat(seg, '/', at + 1)
   local id, attempt = rest:match('^(%d+)/(%d+)$')
   return {
-    host = host,
-    repo = owner .. '/' .. name,
-    kind = kind,
+    host = seg[1],
+    repo = table.concat(seg, '/', 2, at - 1),
+    kind = seg[at],
     id = id or rest,
     attempt = tonumber(attempt),
   }

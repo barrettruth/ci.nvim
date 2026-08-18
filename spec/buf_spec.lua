@@ -27,6 +27,17 @@ describe('buf.parse', function()
     )
   end)
 
+  it('reads a repository nested under subgroups', function()
+    assert.same(
+      { host = 'gitlab.com', repo = 'g/s/p', kind = 'job', id = '99' },
+      buf.parse('ci://gitlab.com/g/s/p/job/99')
+    )
+    assert.same(
+      { host = 'gitlab.com', repo = 'g/run', kind = 'run', id = '12' },
+      buf.parse('ci://gitlab.com/g/run/run/12')
+    )
+  end)
+
   it('rejects anything it cannot render', function()
     assert.is_nil(buf.parse('ci://github.com/o/r/bogus/1'))
     assert.is_nil(buf.parse('ci://github.com/o/r/job'))
