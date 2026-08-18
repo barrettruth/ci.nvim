@@ -100,12 +100,11 @@ local function api(args, on_done)
   end)
 end
 
----@generic T
 ---@param query string
 ---@param vars table<string, string|integer>
 ---@param repo? string
----@param on_done fun(data?: T, err?: string)
-local function graphql(query, vars, repo, on_done)
+---@return string[]
+local function gql(query, vars, repo)
   local owner, name = owner_name(repo)
   local args = { 'graphql', '-F', 'owner=' .. owner, '-F', 'repo=' .. name }
   for k, v in pairs(vars) do
@@ -114,14 +113,58 @@ local function graphql(query, vars, repo, on_done)
   end
   args[#args + 1] = '-f'
   args[#args + 1] = 'query=' .. query
-  return api(args, function(data, err)
+  return args
+end
+
+---@param data table
+---@return string?
+local function refused(data)
+  local first = data.errors and data.errors[1]
+  return first and (first.message or 'GraphQL error') or nil
+end
+
+---@generic T
+---@param query string
+---@param vars table<string, string|integer>
+---@param repo? string
+---@param on_done fun(data?: T, err?: string)
+local function graphql(query, vars, repo, on_done)
+  return api(gql(query, vars, repo), function(data, err)
     if err then
       return on_done(nil, err)
     end
-    if data.errors and data.errors[1] then
-      return on_done(nil, data.errors[1].message or 'GraphQL error')
+    local bad = refused(data)
+    if bad then
+      return on_done(nil, bad)
     end
     on_done(data.data)
+  end)
+end
+
+--- Every page of a connection. gh repeats the query with the cursor the last
+--- page ended on, so long as the query takes an `$endCursor` and asks for
+--- `pageInfo`, and writes a document a page that only `--slurp` makes one.
+---@param query string
+---@param vars table<string, string|integer>
+---@param repo? string
+---@param on_done fun(pages?: table[], err?: string)
+local function graphql_pages(query, vars, repo, on_done)
+  local args = gql(query, vars, repo)
+  table.insert(args, 2, '--paginate')
+  table.insert(args, 3, '--slurp')
+  return api(args, function(pages, err)
+    if err then
+      return on_done(nil, err)
+    end
+    local out = {}
+    for _, page in ipairs(pages or {}) do
+      local bad = refused(page)
+      if bad then
+        return on_done(nil, bad)
+      end
+      out[#out + 1] = page.data
+    end
+    on_done(out)
   end)
 end
 
@@ -129,7 +172,7 @@ end
 --- rollup state, and every context, Actions or otherwise. `databaseId` on a
 --- CheckRun is the Actions job id, which is what the log endpoint takes.
 local CHECKS_FOR_REV = [[
-query($owner:String!,$repo:String!,$expr:String!){
+query($owner:String!,$repo:String!,$expr:String!,$endCursor:String){
   repository(owner:$owner,name:$repo){
     nameWithOwner
     object(expression:$expr){
@@ -138,8 +181,9 @@ query($owner:String!,$repo:String!,$expr:String!){
         messageHeadline
         statusCheckRollup{
           state
-          contexts(first:100){
+          contexts(first:100,after:$endCursor){
             totalCount
+            pageInfo{ hasNextPage endCursor }
             nodes{
               __typename
               ... on CheckRun{
@@ -237,21 +281,28 @@ end
 ---@param repo? string
 ---@param on_done fun(res?: ci.gh.Rollup, err?: string)
 function M.rollup(expr, repo, on_done)
-  return graphql(CHECKS_FOR_REV, { expr = expr }, repo, function(data, err)
+  return graphql_pages(CHECKS_FOR_REV, { expr = expr }, repo, function(pages, err)
     if err then
       return on_done(nil, err)
     end
-    local obj = vim.tbl_get(data or {}, 'repository', 'object')
+    local first = (pages or {})[1]
+    local obj = vim.tbl_get(first or {}, 'repository', 'object')
     if not obj or not obj.oid then
       return on_done(nil, ('no such revision on %s: %s'):format(slug(repo), expr))
     end
+    ---@type ci.gh.RollupNode[]
+    local nodes = {}
+    for _, page in ipairs(pages) do
+      local ctx = vim.tbl_get(page, 'repository', 'object', 'statusCheckRollup', 'contexts')
+      vim.list_extend(nodes, ctx and ctx.nodes or {})
+    end
     local rollup = obj.statusCheckRollup
     on_done({
-      repo = vim.tbl_get(data, 'repository', 'nameWithOwner'),
+      repo = vim.tbl_get(first, 'repository', 'nameWithOwner'),
       oid = obj.oid,
       headline = obj.messageHeadline,
       state = rollup and rollup.state or nil,
-      checks = to_checks(rollup and rollup.contexts and rollup.contexts.nodes),
+      checks = to_checks(nodes),
     })
   end)
 end
