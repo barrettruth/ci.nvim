@@ -84,6 +84,9 @@ local function resolve(t, on_uri, on_err)
   end
 
   if t.kind == 'workflow' then
+    if not be.latest_run then
+      return on_err(('%s does not name a run by workflow file'):format(host))
+    end
     return be.latest_run(t.file, t.repo, function(run, e)
       if e then
         return on_err(e)
