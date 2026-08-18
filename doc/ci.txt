@@ -228,8 +228,9 @@ does not fold and `[[`/`]]` have nothing to move between.
 A GitLab checks list names no stage. A commit's statuses do not carry one,
 where a pipeline's own job list does.
 
-Retrying a GitLab pipeline runs the jobs that did not pass. There is no asking
-for all of them, and no forcing a cancel already under way.
+Retrying a GitLab pipeline retries its failed and canceled jobs, and does
+nothing where it has none. Cancelling reports success whatever state the
+pipeline is in, so a second `cc` cannot force one already under way.
 
 GitLab does not resolve revisions remotely either, so `:CI {rev}` takes a
 branch, a tag or a SHA, and `:CI HEAD` is answered locally.

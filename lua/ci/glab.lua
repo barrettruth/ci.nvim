@@ -151,12 +151,25 @@ end
 ---@field target_url? string
 ---@field started_at? string
 
---- A job gitlab was told it may fail is neither a pass nor a failure, and
---- `warning` is the word `status.bucket` files under attention.
+--- gitlab keeps one field where ci.nvim keeps two: how far a job got, and how
+--- it ended. Only a job that has ended has a conclusion, and one told it may
+--- fail ends as a warning rather than as a failure.
 ---@param s { status: string, allow_failure?: boolean }
 ---@return ci.Conclusion?
 local function conclusion(s)
-  return (s.status == 'failed' and s.allow_failure) and 'warning' or nil
+  if s.status == 'failed' then
+    return s.allow_failure and 'warning' or 'failure'
+  end
+  if s.status == 'success' then
+    return 'success'
+  end
+  if s.status == 'canceled' then
+    return 'cancelled'
+  end
+  if s.status == 'skipped' then
+    return 'skipped'
+  end
+  return nil
 end
 
 ---@param rows? ci.glab.Status[]
@@ -358,9 +371,9 @@ function M.run_jobs(id, _attempt, repo, on_done)
   end)
 end
 
---- Retrying a pipeline runs the jobs that did not pass, which is the whole of
---- what gitlab offers: there is no asking for all of them, and no forcing a
---- cancel that is already under way.
+--- gitlab retries the failed and canceled jobs of a pipeline and nothing else,
+--- and has no effect at all where there are none. Cancelling answers 200
+--- whatever state the pipeline is in, so a second ask cannot force it.
 ---@param id integer
 ---@param what ci.gh.Act
 ---@param repo? string

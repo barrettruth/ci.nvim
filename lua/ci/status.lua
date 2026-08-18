@@ -12,6 +12,7 @@ local M = {}
 ---@alias ci.gitlab.Status
 ---| 'created'
 ---| 'waiting_for_resource'
+---| 'waiting_for_callback'
 ---| 'preparing'
 ---| 'pending'
 ---| 'running'
@@ -73,6 +74,7 @@ local BUCKET = {
   requested = 'pending',
   waiting = 'pending',
   waiting_for_resource = 'pending',
+  waiting_for_callback = 'pending',
   pending = 'pending',
   expected = 'pending',
   blocked = 'pending',

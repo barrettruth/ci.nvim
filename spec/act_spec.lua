@@ -49,6 +49,16 @@ describe('act.scope', function()
     assert.same(2, n)
   end)
 
+  it('counts a gitlab failure and leaves its manual jobs alone', function()
+    local what, n = act.scope({
+      { name = 'a', status = 'success', conclusion = 'success' },
+      { name = 'b', status = 'failed', conclusion = 'failure' },
+      { name = 'c', status = 'manual' },
+    })
+    assert.same('rerun-failed-jobs', what)
+    assert.same(1, n)
+  end)
+
   it('leaves a run still going to github to refuse', function()
     local what, n = act.scope({ { name = 'a', status = 'in_progress' } })
     assert.same('rerun', what)
