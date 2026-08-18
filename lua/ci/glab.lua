@@ -2,6 +2,7 @@ local M = {}
 
 local API = 10000
 local GIT = 2000
+local LIST = 30000
 local LOG = 30000
 
 ---@type ci.Nouns
@@ -112,6 +113,30 @@ local function api(path, on_done)
   end)
 end
 
+--- Every page of a list. `--paginate` alone writes one array per page, which
+--- is two documents and no JSON reader's idea of one; ndjson makes it a row a
+--- line instead. A pipeline of 161 jobs is ordinary on gitlab, so asking for
+--- the first hundred and stopping loses jobs and miscounts the rest.
+---@generic T
+---@param path string
+---@param on_done fun(rows?: T[], err?: string)
+local function list(path, on_done)
+  return run({ 'api', '--paginate', '--output', 'ndjson', path }, function(out, err)
+    if err then
+      return on_done(nil, err)
+    end
+    local rows = {}
+    for line in (out or ''):gmatch('([^\n]+)') do
+      local ok, decoded = pcall(vim.json.decode, line, { luanil = { object = true, array = true } })
+      if not ok or type(decoded) ~= 'table' then
+        return on_done(nil, 'malformed JSON from glab')
+      end
+      rows[#rows + 1] = decoded
+    end
+    on_done(rows)
+  end, LIST)
+end
+
 --- The project's full path. A `ci://` name has to spell it out, and glab's
 --- placeholder resolves without ever saying what it resolved to.
 ---@param repo? string
@@ -208,7 +233,7 @@ function M.rollup(expr, repo, on_done)
         return on_done(nil, e)
       end
       local at = ('projects/%s/repository/commits/%s/statuses?per_page=100'):format(p, commit.id)
-      api(at, function(rows, e2)
+      list(at, function(rows, e2)
         if e2 then
           return on_done(nil, e2)
         end
@@ -358,7 +383,7 @@ end
 ---@param on_done fun(jobs?: ci.gh.Job[], err?: string)
 function M.run_jobs(id, _attempt, repo, on_done)
   local at = ('projects/%s/pipelines/%d/jobs?per_page=100'):format(project(repo), id)
-  api(at, function(rows, err)
+  list(at, function(rows, err)
     if err then
       return on_done(nil, err)
     end
