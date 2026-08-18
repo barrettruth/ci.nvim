@@ -249,7 +249,12 @@ function M.parse(text, steps, be)
 
   ---@type ci.Hl?
   local annot
-  for line in (text .. '\n'):gmatch('([^\n]*)\n') do
+  -- A log ends in a newline of its own, and a second would draw a line it does
+  -- not have. One it genuinely ends on is still its own.
+  if text:sub(-1) ~= '\n' then
+    text = text .. '\n'
+  end
+  for line in text:gmatch('([^\n]*)\n') do
     -- A runner that erases to end of line after a marker leaves the escape,
     -- the carriage return before it, and sometimes a note that it would like
     -- the section folded. None of the three means anything in a buffer, and a

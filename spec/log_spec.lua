@@ -168,3 +168,13 @@ describe('log.parse debug markers', function()
     assert.same('x', log.marker('::debug::x', 'debug'))
   end)
 end)
+
+describe('log.parse line endings', function()
+  it('draws no line the log does not end on', function()
+    assert.same(2, #log.parse(ts('00.0000000', 'a') .. '\n' .. ts('01.0000000', 'b') .. '\n', {}))
+  end)
+
+  it('keeps a blank line the log does end on', function()
+    assert.same(2, #log.parse(ts('00.0000000', 'a') .. '\n\n', {}))
+  end)
+end)
