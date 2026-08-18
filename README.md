@@ -16,9 +16,9 @@ real ANSI colours, step-level folds, and more.
 
 - Neovim 0.13+
 - `git`
-- [`gh`](https://cli.github.com) for github.com, authenticated
-- [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com, authenticated
-- [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+, authenticated
+- (Optionally) [`gh`](https://cli.github.com) for github.com
+- (Optionally) [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com
+- (Optionally) [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+
 
 The forge is chosen from `upstream`, else `origin`, matching how `tea` picks
 the repository to query. Only gitlab.com is recognised as GitLab; any other
@@ -63,8 +63,9 @@ luarocks install ci.nvim
 ```
 
 Work with a `ci://` buffer via neovim-native mappings. `<CR>` opens the check
-under the cursor, `-` goes back to the list you came from, `cr` re-runs and
-`cc` cancels, walk job steps with `[[` and `]]`, and more.
+under the cursor — or, on GitLab, the child pipeline a trigger job started —
+`-` goes back to the list you came from, `cr` re-runs and `cc` cancels, walk
+job steps with `[[` and `]]`, and more.
 
 ## Documentation
 

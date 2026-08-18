@@ -125,20 +125,25 @@ local function from_rollup(buf, gen, repo, oid, label, url, host)
 end
 
 ---@param jobs ci.gh.Job[]
+---@param u ci.Uri
 ---@param page? string the run's browser page, where jobs are named by position
 ---@return ci.Check[]
-local function jobs_to_checks(jobs, page)
+local function jobs_to_checks(jobs, u, page)
   ---@type ci.Check[]
   local out = {}
   for i, j in ipairs(jobs) do
+    -- A job that only triggered another run has no log of its own, so the row
+    -- leads to the run it triggered.
+    local opens = j.downstream and ('ci://%s/%s/run/%d'):format(u.host, u.repo, j.downstream) or nil
     out[#out + 1] = {
       name = j.name,
       status = j.status,
       conclusion = j.conclusion,
       url = j.html_url or require('ci.tea').job_page(page, i - 1, j.attempt),
-      job_id = j.id,
+      job_id = not opens and j.id or nil,
       run_id = j.run_id,
       group = j.workflow_name,
+      opens = opens,
     }
   end
   return out
@@ -194,7 +199,7 @@ function M.render(buf, gen, u)
         if err then
           return buf_util.fail(buf, err)
         end
-        local checks = jobs_to_checks(jobs, page)
+        local checks = jobs_to_checks(jobs, u, page)
         local text = summarize(checks)
         local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
           or ('run %d'):format(n)

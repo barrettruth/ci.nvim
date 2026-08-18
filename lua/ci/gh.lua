@@ -182,6 +182,7 @@ query($owner:String!,$repo:String!,$expr:String!){
 ---@field run_id? integer
 ---@field group? string
 ---@field started_at? string
+---@field opens? string a `ci://` name this row leads to, where it is not a log
 
 --- Flattens rollup contexts, keeping the newest of each (group, name): a
 --- rerun leaves the superseded attempt in the rollup.
@@ -347,6 +348,8 @@ end
 ---@field html_url? string
 ---@field workflow_name? string
 ---@field steps? ci.gh.JobStep[]
+---@field downstream? integer the run this one triggered, when it triggered one
+--- rather than running anything itself
 
 ---@param id integer
 ---@param repo? string

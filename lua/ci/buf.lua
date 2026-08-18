@@ -367,6 +367,9 @@ function M.enter()
   if not check then
     return
   end
+  if check.opens then
+    return M.open(check.opens, { keepalt = true })
+  end
   if check.job_id then
     local from = api.nvim_buf_get_name(buf)
     M.open(('ci://%s/%s/job/%d'):format(u.host, u.repo, check.job_id), { keepalt = true })

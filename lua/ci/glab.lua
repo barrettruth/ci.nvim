@@ -331,6 +331,7 @@ end
 ---@field allow_failure? boolean
 ---@field web_url? string
 ---@field pipeline? { id: integer, sha: string }
+---@field downstream_pipeline? { id: integer, project_id: integer }
 
 --- The shared job shape is github's, so a stage travels in the field a
 --- workflow name would. A gitlab job has no steps of its own.
@@ -382,17 +383,34 @@ end
 ---@param repo? string
 ---@param on_done fun(jobs?: ci.gh.Job[], err?: string)
 function M.run_jobs(id, _attempt, repo, on_done)
-  local at = ('projects/%s/pipelines/%d/jobs?per_page=100'):format(project(repo), id)
-  list(at, function(rows, err)
+  local p = project(repo)
+  list(('projects/%s/pipelines/%d/jobs?per_page=100'):format(p, id), function(rows, err)
     if err then
       return on_done(nil, err)
     end
-    ---@type ci.glab.Job[]
-    local jobs = rows or {}
-    table.sort(jobs, function(a, b)
-      return a.id < b.id
+    -- A job that triggers a child pipeline is in no job list. It has one of
+    -- its own, and on a project that leans on child pipelines it is where most
+    -- of the work is: a pipeline can report a failure that none of the jobs
+    -- here account for.
+    list(('projects/%s/pipelines/%d/bridges?per_page=100'):format(p, id), function(bridges, e)
+      if e then
+        return on_done(nil, e)
+      end
+      ---@type ci.gh.Job[]
+      local jobs = {}
+      for _, j in ipairs(rows or {}) do
+        jobs[#jobs + 1] = to_job(j)
+      end
+      for _, b in ipairs(bridges or {}) do
+        local j = to_job(b)
+        j.downstream = b.downstream_pipeline and b.downstream_pipeline.id or nil
+        jobs[#jobs + 1] = j
+      end
+      table.sort(jobs, function(a, b)
+        return a.id < b.id
+      end)
+      on_done(jobs)
     end)
-    on_done(vim.tbl_map(to_job, jobs))
   end)
 end
 
