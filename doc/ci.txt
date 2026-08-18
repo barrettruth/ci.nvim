@@ -5,8 +5,8 @@ Author:  Barrett Ruth <br@barrettruth.com> License: GPL-3.0
 ==============================================================================
 INTRODUCTION                                                    *ci* *ci.nvim*
 
-GitHub Actions and Forgejo Actions status and logs for whatever you are
-working on. One command, |:CI|, and no configuration.
+GitHub Actions, GitLab CI/CD and Forgejo Actions status and logs for whatever
+you are working on. One command, |:CI|, and no configuration.
 
 ==============================================================================
 REQUIREMENTS                                                 *ci-requirements*
@@ -14,10 +14,12 @@ REQUIREMENTS                                                 *ci-requirements*
 - Neovim 0.13+
 - `git`
 - `gh`, authenticated (`gh auth login`), for github.com
+- `glab`, authenticated (`glab auth login`), for gitlab.com
 - `tea`, authenticated (`tea login add`), for Forgejo 16+
 
 The forge is chosen from the host of the `upstream` remote, else `origin`:
-github.com uses `gh`, anything else uses `tea`.
+github.com uses `gh`, gitlab.com uses `glab`, anything else uses `tea`. A
+GitLab served from any other host is read as Forgejo.
 
 ==============================================================================
 INSTALL                                                           *ci-install*
@@ -59,6 +61,13 @@ COMMAND                                                          *ci-commands*
                           .../actions                         the repository
                         A `#step:{n}:{line}` fragment is accepted and ignored.
 
+                        On GitLab:
+                          .../-/pipelines/{id}                a pipeline
+                          .../-/jobs/{id}                     a job log
+                          .../-/merge_requests/{n}            a merge request
+                          .../-/commit/{sha}                  a commit
+                          .../-/pipelines                     the repository
+
                         On Forgejo:
                           .../actions/runs/{run}              a run
                           .../actions/runs/{run}/jobs/{n}     a run
@@ -76,18 +85,21 @@ Window modifiers split rather than replace: `:vertical CI`, `:tab CI`,
 Repository resolution is delegated entirely to the CLI. For `gh` that means
 fork pull requests resolve to the base repository (where checks usually live);
 if it picks the wrong one, fix it with `gh repo set-default`. `tea` has no
-equivalent, so on Forgejo a fork is queried as itself.
+equivalent, so on Forgejo a fork is queried as itself. On GitLab a merge
+request opened from a fork is followed to the fork, where its pipeline runs.
 
 ==============================================================================
 BUFFERS                                                           *ci-buffers*
 
 Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
 >
-    ci://{host}/{owner}/{repo}/job/{job_id}
-    ci://{host}/{owner}/{repo}/run/{run_id}[/{attempt}]
-    ci://{host}/{owner}/{repo}/pr/{number}
-    ci://{host}/{owner}/{repo}/checks/{oid}
+    ci://{host}/{project}/job/{job_id}
+    ci://{host}/{project}/run/{run_id}[/{attempt}]
+    ci://{host}/{project}/pr/{number}
+    ci://{host}/{project}/checks/{oid}
 <
+{project} is `{owner}/{repo}`, or a GitLab path of any depth.
+
 A buffer with anything still running reloads itself every ten seconds and
 stops once the checks settle, or once no window is showing it. `:e` and `R`
 refresh on demand; either way the cursor and scroll position are kept.
@@ -95,10 +107,11 @@ Re-running |:CI| for a buffer that is already open just moves to its window
 without refetching.
 
 A job buffer folds two levels by default: step, then `##[group]`. Forgejo does
-not expose step boundaries, so its logs fold on `##[group]` alone. The first
-failing step is opened and the cursor placed on it. Interact with the folds as
-you would regularly; `zM`/`zR` collapses/expands the step list. For example,
-to disable all folds always: >lua
+not expose step boundaries, so its logs fold on `##[group]` alone, and GitLab
+writes neither, so its logs do not fold. The first failing step is opened and
+the cursor placed on it. Interact with the folds as you would regularly;
+`zM`/`zR` collapses/expands the step list. For example, to disable all folds
+always: >lua
     vim.api.nvim_create_autocmd('BufWinEnter', {
       pattern = 'ci://*',
       callback = function()
@@ -134,17 +147,15 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
     -       <Plug>(ci-up)          Go back to the list you came from.
     R       <Plug>(ci-refresh)     Reload, same as `:e`.
     ]]      <Plug>(ci-next-step)   In a job log, go to the next step.
-                                   Unmapped on Forgejo, which has no steps.
     [[      <Plug>(ci-prev-step)   In a job log, go to the previous step.
-                                   Unmapped on Forgejo, which has no steps.
     gS      <Plug>(ci-timestamps)  In a job log, toggle the timestamps.
     cr      <Plug>(ci-rerun)       Re-run the run under the cursor: the
                                    jobs of it that did not pass, or all of
                                    them if they all did. Confirms first.
-                                   GitHub only.
+                                   Not on Forgejo.
     cc      <Plug>(ci-cancel)      Cancel the run under the cursor. Again,
                                    while it is still cancelling, forces it.
-                                   Confirms first. GitHub only.
+                                   Confirms first. Not on Forgejo.
     gX      <Plug>(ci-web)         Open the current buffer in a browser.
     g?      <Plug>(ci-help)        This section.
 
@@ -161,7 +172,7 @@ All groups are links and can be overridden.
     CiRunning    ->  DiagnosticWarn    ●  in progress
     CiPending    ->  Comment           ○  queued, waiting, requested
     CiSkipped    ->  Comment           ⊘  skipped, neutral, stale, cancelled
-    CiAttention  ->  DiagnosticWarn    !  action required
+    CiAttention  ->  DiagnosticWarn    !  action required, allowed to fail
     CiGroup      ->  Title                a `##[group]` heading
     CiCommand    ->  Directory            a `[command]` line
     CiDebug      ->  Debug                a `##[debug]` line
@@ -182,7 +193,7 @@ foreground tint.
 ==============================================================================
 HEALTH                                                             *ci-health*
 
-Checks the Neovim version, the `origin` host, and both CLIs: >
+Checks the Neovim version, the `origin` host, and all three CLIs: >
     :checkhealth ci
 <
 ==============================================================================
@@ -199,10 +210,10 @@ Forgejo's Actions API is younger than GitHub's, so it has quite a few
 behaviors missing
 
 Firstly, Forgejo will not say where one step of a job ends and the next
-begins. Resultedly, a job log folds on `##[group]` alone. Step folds, step
-headers, and `[[`/`]]` are GitHub-only.
+begins. Resultedly, a job log folds on `##[group]` alone. Step folds and step
+headers are GitHub-only.
 
-Re-running and cancelling are GitHub-only. `cr` and `cc` are unmapped on
+Re-running and cancelling are unavailable. `cr` and `cc` are unmapped on
 Forgejo.
 
 Forgejo 16.0+ also lacks fetching individual jobs and does not resolve
@@ -210,6 +221,18 @@ revisions remotely. Therefore, `:CI {rev}` only sees what you've fetched.
 Individual jobs cannot be fetched either, meaning job URLs opened directly do
 not show name nor status. Lastly, this also means that older job attemps
 (100+) cannot be fetched
+
+GitLab jobs have no steps, and its logs carry no group markers, so a job log
+does not fold and `[[`/`]]` have nothing to move between.
+
+A GitLab checks list names no stage. A commit's statuses do not carry one,
+where a pipeline's own job list does.
+
+Retrying a GitLab pipeline runs the jobs that did not pass. There is no asking
+for all of them, and no forcing a cancel already under way.
+
+GitLab does not resolve revisions remotely either, so `:CI {rev}` takes a
+branch, a tag or a SHA, and `:CI HEAD` is answered locally.
 
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

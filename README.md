@@ -1,6 +1,6 @@
 # ci.nvim
 
-**GitHub and Forgejo Actions CI in Neovim**
+**GitHub Actions, GitLab CI/CD and Forgejo Actions in Neovim**
 
 > [!NOTE]
 > Development, issues, and pull requests happen on
@@ -9,18 +9,20 @@
 
 ![image](https://forge.barrettruth.com/attachments/d64b111f-9c84-4558-a725-1a5aea8570f5)
 
-Experience the power of `:CI`. Native Actions logs in normal Neovim buffers
-with real ANSI colours, step-level folds, and more.
+Experience the power of `:CI`. Native CI logs in normal Neovim buffers with
+real ANSI colours, step-level folds, and more.
 
 ## Requirements
 
 - Neovim 0.13+
 - `git`
 - [`gh`](https://cli.github.com) for github.com, authenticated
+- [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com, authenticated
 - [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+, authenticated
 
 The forge is chosen from `upstream`, else `origin`, matching how `tea` picks
-the repository to query.
+the repository to query. Only gitlab.com is recognised as GitLab; any other
+host is read as Forgejo.
 
 ## Installation
 
@@ -49,9 +51,11 @@ luarocks install ci.nvim
 :CI v0.11.0
 :CI HEAD~3
 
-" any github.com or Forgejo CI URL
+" any github.com, gitlab.com or Forgejo CI URL
 :CI https://github.com/neovim/neovim/actions/runs/30208531214/job/89810718120
 :CI https://github.com/neovim/neovim/pull/40993
+:CI https://gitlab.com/gitlab-org/cli/-/pipelines/2767853157
+:CI https://gitlab.com/gitlab-org/cli/-/merge_requests/3734
 :CI https://codeberg.org/forgejo/forgejo/actions/runs/12
 
 " the <cWORD> under the cursor
@@ -71,8 +75,12 @@ under the cursor, `-` goes back to the list you came from, `cr` re-runs and
 ## Known limitations
 
 - **In-progress jobs (GitHub)**: gh [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their step status only, until completion.
+- **Steps and folds (GitLab)**: jobs have no steps and logs carry no group markers, so a job log does not fold and `[[`/`]]` have nothing to move between.
+- **Stages (GitLab)**: a checks list names no stage, because a commit's statuses do not carry one. A pipeline's own job list does.
+- **Re-run and cancel (GitLab)**: retrying a pipeline runs the jobs that did not pass. There is no re-running all of them, and no forcing a cancel already under way.
+- **Revisions (GitLab)**: not resolved by the server, so `:CI {rev}` takes a branch, tag or SHA, and `:CI HEAD` is answered locally.
 - **Re-run and cancel (Forgejo)**: not supported.
-- **Steps (Forgejo)**: no step names, step folds, or `[[`/`]]`. The boundaries exist in Forgejo's database but are not served by its API.
+- **Steps (Forgejo)**: no step names or step folds. The boundaries exist in Forgejo's database but are not served by its API.
 - **Revisions (Forgejo)**: resolved with local `git rev-parse`, not by the server, so `:CI master` is your last fetch (may differ from the remote's ref).
 - **Forks (Forgejo)**: `tea` resolves by remote name, preferring `upstream` over `origin`, rather than by asking the forge which repository is the base. A fork whose parent is not named `upstream` is queried as itself, and an `upstream` on a different forge is looked up on the wrong host.
 - **Bare job ids (Forgejo)**: there is no single-job endpoint, so a job opened from a pasted URL shows its log without a name or status.
