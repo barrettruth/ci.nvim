@@ -1,4 +1,5 @@
 local buf_util = require('ci.buf')
+local forge = require('ci.forge')
 local gh = require('ci.gh')
 local msg = require('ci.msg')
 
@@ -27,6 +28,13 @@ local busy = {}
 ---@field label string the group, when the view names one
 ---@field rows? ci.Check[] what the view shows of this run
 
+--- What the forge at {host} calls a run.
+---@param host string
+---@return string
+local function noun(host)
+  return forge.of(host).nouns.run
+end
+
 --- What the two keys act on, or the reason they cannot. Read at the keypress,
 --- because a list re-sorts itself worst-first on every poll and the question
 --- that follows is a callback.
@@ -38,7 +46,7 @@ local busy = {}
 function M.target(u, b, lnum)
   if u.kind == 'job' then
     if not b.run_id then
-      return nil, 'this job does not name a run'
+      return nil, ('this job does not name a %s'):format(noun(u.host))
     end
     return { run = b.run_id, repo = u.repo, host = u.host, label = b.group or '' }
   end
@@ -50,7 +58,9 @@ function M.target(u, b, lnum)
     -- A pinned attempt answers with its own state and the live run's
     -- rerun_url, so acting here would change something else.
     if u.attempt then
-      return nil, ('this is attempt %d of run %s; open the run itself'):format(u.attempt, u.id)
+      local what = noun(u.host)
+      return nil,
+        ('this is attempt %d of %s %s; open the %s itself'):format(u.attempt, what, u.id, what)
     end
     local run = tonumber(u.id)
     if not run then
@@ -75,7 +85,7 @@ function M.target(u, b, lnum)
   -- The run, never the job: a check posted by an app has a databaseId of its
   -- own and no Actions run behind it.
   if not check.run_id then
-    return nil, ('no Actions run for %s'):format(check.name or 'this check')
+    return nil, ('no %s for %s'):format(noun(u.host), check.name or 'this check')
   end
   for _, c in pairs(b.checks or {}) do
     if c.run_id == check.run_id then
@@ -212,15 +222,17 @@ end
 ---@param t ci.act.Target
 local function offer(buf, t)
   local what, n = M.scope(t.rows or {})
+  local run_noun = noun(t.host)
   local prompt = n > 0
-      and ('Re-run %s in run %d%s? [y/N] '):format(
+      and ('Re-run %s in %s %d%s? [y/N] '):format(
         jobs(n, what == 'rerun-failed-jobs'),
+        run_noun,
         t.run,
         tag(t)
       )
-    or ('Re-run run %d%s? [y/N] '):format(t.run, tag(t))
+    or ('Re-run %s %d%s? [y/N] '):format(run_noun, t.run, tag(t))
   confirm(prompt, function()
-    send(buf, t, what, ('Re-running run %d'):format(t.run))
+    send(buf, t, what, ('Re-running %s %d'):format(run_noun, t.run))
   end, function()
     busy[buf] = nil
   end)
@@ -241,7 +253,7 @@ function M.rerun()
   gh.run_jobs(t.run, nil, t.repo, function(found, err)
     if err or not found then
       busy[buf] = nil
-      return msg.err(err or ('no jobs in run %d'):format(t.run))
+      return msg.err(err or ('no jobs in %s %d'):format(noun(t.host), t.run))
     end
     t.rows = vim.tbl_map(function(j)
       ---@type ci.Check
@@ -257,12 +269,17 @@ function M.cancel()
   if not buf or not t then
     return
   end
+  local run_noun = noun(t.host)
   local force = asked[t.run] or false
   local prompt = force
-      and ('Run %d%s is still cancelling. Force cancel? [y/N] '):format(t.run, tag(t))
-    or ('Cancel run %d%s? [y/N] '):format(t.run, tag(t))
+      and ('%s %d%s is still cancelling. Force cancel? [y/N] '):format(
+        (run_noun:gsub('^%l', string.upper)),
+        t.run,
+        tag(t)
+      )
+    or ('Cancel %s %d%s? [y/N] '):format(run_noun, t.run, tag(t))
   confirm(prompt, function()
-    send(buf, t, force and 'force-cancel' or 'cancel', ('Cancelling run %d'):format(t.run))
+    send(buf, t, force and 'force-cancel' or 'cancel', ('Cancelling %s %d'):format(run_noun, t.run))
   end, function()
     busy[buf] = nil
   end)

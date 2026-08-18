@@ -8,6 +8,10 @@ local GIT = 2000
 local API = 10000
 local LOG = 30000
 
+--- Forgejo Actions is modelled on GitHub's, down to the words.
+---@type ci.Nouns
+M.nouns = { run = 'run', group = 'workflow' }
+
 --- Forgejo ignores `limit` unless `page` is given with it, and answers with
 --- every row when it is not. Always ask for both.
 ---@param n integer

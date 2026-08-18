@@ -4,6 +4,9 @@ local API = 10000
 local LOG = 30000
 local VERSION = 2000
 
+---@type ci.Nouns
+M.nouns = { run = 'run', group = 'workflow' }
+
 --- gh 2.97 stopped printing a response that carries terminal escape sequences
 --- unless asked to, and a job's log is nothing but. Older gh has no such flag
 --- to give, so which one is installed decides whether it is passed.

@@ -1,4 +1,5 @@
 local ansi = require('ci.ansi')
+local forge = require('ci.forge')
 local msg = require('ci.msg')
 
 local api = vim.api
@@ -301,17 +302,20 @@ end
 
 ---@param buf integer
 ---@param kind 'job'|'list'
----@param github boolean github alone exposes step boundaries, and github alone
---- can be asked to rerun or cancel
-local function keymaps(buf, kind, github)
+---@param host string
+local function keymaps(buf, kind, host)
+  -- github alone exposes step boundaries, and github alone can be asked to
+  -- rerun or cancel
+  local github = forge.is_github(host)
+  local nouns = forge.of(host).nouns
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
     map(buf, '-', 'up', 'Go back to the list you came from')
     map(buf, 'R', 'refresh', 'Reload this buffer')
     map(buf, 'gX', 'web', 'Open in the browser')
     if github then
-      map(buf, 'cr', 'rerun', 'Re-run this workflow run')
-      map(buf, 'cc', 'cancel', 'Cancel this workflow run')
+      map(buf, 'cr', 'rerun', ('Re-run this %s'):format(nouns.run))
+      map(buf, 'cc', 'cancel', ('Cancel this %s'):format(nouns.run))
     end
     if kind == 'job' then
       if github then
@@ -424,7 +428,7 @@ function M.load(buf, uri)
     times = prev and prev.times or nil,
   }
 
-  keymaps(buf, u.kind == 'job' and 'job' or 'list', require('ci.forge').is_github(u.host))
+  keymaps(buf, u.kind == 'job' and 'job' or 'list', u.host)
 
   vim.bo[buf].busy = 1
   settle(buf, 'success')
