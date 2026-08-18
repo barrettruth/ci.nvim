@@ -48,7 +48,7 @@ local function paint(buf, gen, repo, summary, title, checks)
     local sym, hl = status.of(c.status, c.conclusion)
     local name = c.name or '?'
     local pad = math.max(0, width - vim.fn.strdisplaywidth(name))
-    local suffix = c.workflow or (c.job_id and '' or 'external')
+    local suffix = c.group or (c.job_id and '' or 'external')
     local text = ('%s %s%s  %s'):format(sym, name, (' '):rep(pad), suffix)
     lines[#lines + 1] = (text:gsub('%s+$', ''))
     marks[#lines] = {
@@ -138,7 +138,7 @@ local function jobs_to_checks(jobs, page)
       url = j.html_url or require('ci.tea').job_page(page, i - 1, j.attempt),
       job_id = j.id,
       run_id = j.run_id,
-      workflow = j.workflow_name,
+      group = j.workflow_name,
     }
   end
   return out

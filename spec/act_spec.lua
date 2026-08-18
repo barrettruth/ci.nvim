@@ -15,7 +15,7 @@ end
 local function bufvar(over)
   return vim.tbl_extend(
     'force',
-    { title = '', status = '', repo = 'o/r', workflow = '', url = '', gen = 1 },
+    { title = '', status = '', repo = 'o/r', group = '', url = '', gen = 1 },
     over or {}
   )
 end
@@ -60,8 +60,8 @@ describe('act.target', function()
   it('takes the run of the row under the cursor', function()
     local b = bufvar({
       checks = {
-        [1] = { name = 'a', run_id = 11, job_id = 21, workflow = 'test' },
-        [2] = { name = 'b', run_id = 12, job_id = 22, workflow = 'lint' },
+        [1] = { name = 'a', run_id = 11, job_id = 21, group = 'test' },
+        [2] = { name = 'b', run_id = 12, job_id = 22, group = 'lint' },
       },
     })
     local t = act.target(uri(), b, 2)
@@ -95,7 +95,7 @@ describe('act.target', function()
   end)
 
   it('takes the run itself from a run view', function()
-    local b = bufvar({ checks = { [1] = { name = 'a', run_id = 11, workflow = 'test' } } })
+    local b = bufvar({ checks = { [1] = { name = 'a', run_id = 11, group = 'test' } } })
     local t = act.target(uri({ kind = 'run', id = '11' }), b, 1)
     assert.same(11, t.run)
     assert.same(1, #t.rows)
@@ -108,7 +108,7 @@ describe('act.target', function()
   end)
 
   it('takes the run a job names, wherever the cursor is', function()
-    local b = bufvar({ run_id = 11, workflow = 'test' })
+    local b = bufvar({ run_id = 11, group = 'test' })
     local t = act.target(uri({ kind = 'job', id = '22' }), b, 40)
     assert.same(11, t.run)
     assert.is_nil(t.rows)

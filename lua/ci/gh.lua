@@ -177,10 +177,10 @@ query($owner:String!,$repo:String!,$expr:String!){
 ---@field url? string
 ---@field job_id? integer
 ---@field run_id? integer
----@field workflow? string
+---@field group? string
 ---@field started_at? string
 
---- Flattens rollup contexts, keeping the newest of each (workflow, name): a
+--- Flattens rollup contexts, keeping the newest of each (group, name): a
 --- rerun leaves the superseded attempt in the rollup.
 ---@param nodes? ci.gh.RollupNode[]
 ---@return ci.Check[]
@@ -199,14 +199,14 @@ local function to_checks(nodes)
         url = n.detailsUrl,
         job_id = tonumber(job_id) or n.databaseId,
         run_id = tonumber(run_id),
-        workflow = vim.tbl_get(n, 'checkSuite', 'workflowRun', 'workflow', 'name'),
+        group = vim.tbl_get(n, 'checkSuite', 'workflowRun', 'workflow', 'name'),
         started_at = n.startedAt,
       }
     elseif n.__typename == 'StatusContext' then
       c = { name = n.context, conclusion = n.state, url = n.targetUrl }
     end
     if c then
-      local key = (c.workflow or '') .. '\0' .. c.name
+      local key = (c.group or '') .. '\0' .. c.name
       local prev = seen[key]
       if not prev then
         out[#out + 1] = c

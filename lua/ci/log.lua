@@ -572,7 +572,7 @@ function M.render(buf, gen, u)
         title = kept(job.name, prev.title),
         status = (job.status ~= nil and job.status ~= '') and status.paint(hl, sym)
           or kept(prev.status, status.paint(hl, sym)),
-        workflow = kept(job.workflow_name, prev.workflow),
+        group = kept(job.workflow_name, prev.group),
         url = kept(job.html_url, prev.url),
         run_id = job.run_id or prev.run_id,
         up = vim.b[buf].ci.up

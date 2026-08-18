@@ -18,7 +18,7 @@ local M = {}
 ---@field title string
 ---@field status string
 ---@field repo string
----@field workflow string
+---@field group string
 ---@field url string
 ---@field up? string
 ---@field run_id? integer the run a job belongs to
@@ -369,7 +369,7 @@ function M.enter()
       up = from,
       title = check.name or '',
       status = st.paint(hl, sym),
-      workflow = check.workflow or '',
+      group = check.group or '',
       url = check.url or '',
     })
     return
@@ -416,7 +416,7 @@ function M.load(buf, uri)
     title = prev and prev.title or '',
     status = prev and prev.status or '',
     repo = u.repo,
-    workflow = prev and prev.workflow or '',
+    group = prev and prev.group or '',
     url = prev and prev.url or '',
     run_id = prev and prev.run_id or nil,
     gen = gen,

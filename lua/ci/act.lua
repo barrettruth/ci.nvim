@@ -24,7 +24,7 @@ local busy = {}
 ---@field run integer
 ---@field repo string
 ---@field host string
----@field label string the workflow, when the view names one
+---@field label string the group, when the view names one
 ---@field rows? ci.Check[] what the view shows of this run
 
 --- What the two keys act on, or the reason they cannot. Read at the keypress,
@@ -40,7 +40,7 @@ function M.target(u, b, lnum)
     if not b.run_id then
       return nil, 'this job does not name a run'
     end
-    return { run = b.run_id, repo = u.repo, host = u.host, label = b.workflow or '' }
+    return { run = b.run_id, repo = u.repo, host = u.host, label = b.group or '' }
   end
 
   ---@type ci.Check[]
@@ -63,7 +63,7 @@ function M.target(u, b, lnum)
       run = run,
       repo = u.repo,
       host = u.host,
-      label = rows[1] and rows[1].workflow or '',
+      label = rows[1] and rows[1].group or '',
       rows = rows,
     }
   end
@@ -86,7 +86,7 @@ function M.target(u, b, lnum)
     run = check.run_id,
     repo = u.repo,
     host = u.host,
-    label = check.workflow or '',
+    label = check.group or '',
     rows = rows,
   }
 end
@@ -120,7 +120,7 @@ local function jobs(n, failed)
   return n == 1 and '1 job' or ('all %d jobs'):format(n)
 end
 
---- " (build)", or nothing when the view cannot name the workflow.
+--- " (build)", or nothing when the view cannot name the group.
 ---@param t ci.act.Target
 ---@return string
 local function tag(t)
