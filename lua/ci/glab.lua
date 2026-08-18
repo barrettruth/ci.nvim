@@ -44,8 +44,8 @@ function M.marks(body)
   if verb ~= 'start' then
     return nil
   end
-  -- The runner sometimes puts the first line of the section after the marker
-  -- rather than under it, and that reads better than the name would.
+  -- The runner sometimes writes the section's first line after the marker
+  -- rather than under it.
   return 'group', line:match('\r\27%[0K(.+)$') or name
 end
 

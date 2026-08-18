@@ -252,8 +252,12 @@ function M.parse(text, steps, be)
   for line in (text .. '\n'):gmatch('([^\n]*)\n') do
     -- A runner that erases to end of line after a marker leaves the escape,
     -- the carriage return before it, and sometimes a note that it would like
-    -- the section folded. None of the three means anything in a buffer.
-    local raw = line:gsub('%[collapsed=true%]\r\27%[0K$', ''):gsub('\r\27%[0K$', ''):gsub('\r$', '')
+    -- the section folded. None of the three means anything in a buffer, and a
+    -- line without a carriage return carries none of them.
+    local raw = line
+    if raw:find('\r', 1, true) then
+      raw = raw:gsub('%[collapsed=true%]\r\27%[0K$', ''):gsub('\r\27%[0K$', ''):gsub('\r$', '')
+    end
     local at, body = prefix(raw)
 
     if at then
