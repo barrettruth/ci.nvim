@@ -111,8 +111,8 @@ vim.api.nvim_create_autocmd('BufWipeout', {
 
 local STATUS = [[%{%empty(b:ci.status) ? '' : ' | ' .. b:ci.status%}]]
 local winbar = {
-  job = [[LOG %{b:ci.repo}]] .. STATUS .. [[%( %{b:ci.title}%)%( | %{b:ci.group}%)%<]],
-  list = [[CI %{b:ci.repo}]] .. STATUS .. [[%( | %{b:ci.title}%)%<]],
+  job = [[%#Title#LOG%* %{b:ci.repo}]] .. STATUS .. [[%( %{b:ci.title}%)%( | %{b:ci.group}%)%<]],
+  list = [[%#Title#CI%* %{b:ci.repo}]] .. STATUS .. [[%( | %{b:ci.title}%)%<]],
 }
 
 vim.api.nvim_create_autocmd({ 'BufWinEnter', 'BufReadPost' }, {
