@@ -157,6 +157,9 @@ Buffer-local defaults, only set if you have not mapped the |<Plug>| target:
     cc      <Plug>(ci-cancel)      Cancel the run under the cursor. Again,
                                    while it is still cancelling, forces it.
                                    Confirms first. Not on Forgejo.
+    cp      <Plug>(ci-play)        Start the job under the cursor, where it
+                                   is waiting to be asked for. Confirms
+                                   first. GitLab only.
     gX      <Plug>(ci-web)         Open the current buffer in a browser.
     g?      <Plug>(ci-help)        This section.
 

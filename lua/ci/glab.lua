@@ -440,6 +440,18 @@ function M.run_jobs(id, _attempt, repo, on_done)
   end)
 end
 
+--- Runs a job that was waiting to be asked for. gitlab refuses any job that
+--- was not, so the caller checks before it asks.
+---@param id integer
+---@param repo? string
+---@param on_done fun(err?: string)
+function M.play(id, repo, on_done)
+  local at = ('projects/%s/jobs/%d/play'):format(project(repo), id)
+  return run({ 'api', '--method', 'POST', at }, function(_, err)
+    on_done(err)
+  end)
+end
+
 --- gitlab retries the failed and canceled jobs of a pipeline and nothing else,
 --- and has no effect at all where there are none. Cancelling answers 200
 --- whatever state the pipeline is in, so a second ask cannot force it.

@@ -325,6 +325,9 @@ local function keymaps(buf, kind, host)
       map(buf, 'cr', 'rerun', ('Re-run this %s'):format(be.nouns.run))
       map(buf, 'cc', 'cancel', ('Cancel this %s'):format(be.nouns.run))
     end
+    if be.play and kind == 'list' then
+      map(buf, 'cp', 'play', 'Start the job under the cursor')
+    end
     if kind == 'job' then
       map(buf, ']]', 'next-step', 'Go to the next step')
       map(buf, '[[', 'prev-step', 'Go to the previous step')

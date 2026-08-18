@@ -64,8 +64,8 @@ luarocks install ci.nvim
 
 Work with a `ci://` buffer via neovim-native mappings. `<CR>` opens the check
 under the cursor — or, on GitLab, the child pipeline a trigger job started —
-`-` goes back to the list you came from, `cr` re-runs and `cc` cancels, walk
-job steps with `[[` and `]]`, and more.
+`-` goes back to the list you came from, `cr` re-runs, `cc` cancels, `cp`
+starts a manual job, walk job steps with `[[` and `]]`, and more.
 
 ## Documentation
 

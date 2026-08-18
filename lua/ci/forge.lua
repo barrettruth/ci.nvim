@@ -17,6 +17,7 @@ local M = {}
 ---@field latest_run? fun(file: string, repo?: string, on_done: fun(run?: ci.gh.WorkflowRun, err?: string))
 ---@field act? fun(id: integer, what: ci.gh.Act, repo?: string, on_done: fun(err?: string))
 ---@field acts? table<ci.gh.Act, boolean> which of the four it takes; all, unsaid
+---@field play? fun(id: integer, repo?: string, on_done: fun(err?: string))
 ---@field run_by_index? fun(index: integer, repo?: string, on_done: fun(run?: ci.tea.Run, err?: string))
 ---@field run? fun(id: integer, repo?: string, on_done: fun(run?: ci.tea.Run, err?: string))
 ---@field finished? fun(text: string): boolean

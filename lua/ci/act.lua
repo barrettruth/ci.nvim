@@ -276,6 +276,45 @@ function M.rerun()
   end)
 end
 
+--- Starts the job under the cursor, where it was waiting to be asked for. Only
+--- a list names a job that has not run; a log is one that already did.
+function M.play()
+  local buf = api.nvim_get_current_buf()
+  local u = buf_util.parse(api.nvim_buf_get_name(buf))
+  ---@type ci.BufVar?
+  local b = vim.b[buf].ci
+  if not u or not b or busy[buf] then
+    return
+  end
+  local play = forge.of(u.host).play
+  if not play then
+    return msg.warn(('%s starts no job of its own'):format(u.host))
+  end
+  local check = (b.checks or {})[api.nvim_win_get_cursor(0)[1]]
+  if not check or not check.job_id then
+    return msg.warn('no job on this line')
+  end
+  if check.status ~= 'manual' then
+    return msg.warn('this job is not waiting to be started')
+  end
+  busy[buf] = true
+  confirm(('Start %s? [y/N] '):format(check.name), function()
+    local report = msg.progress(('Starting %s'):format(check.name))
+    play(check.job_id, b.repo, function(err)
+      busy[buf] = nil
+      if err then
+        report('failed')
+        return msg.err(err)
+      end
+      report('success')
+      buf_util.nudge(buf)
+      buf_util.reload(buf)
+    end)
+  end, function()
+    busy[buf] = nil
+  end)
+end
+
 --- Cancels the run under the cursor, forcing it if one was already asked for.
 function M.cancel()
   local buf, t = start()
