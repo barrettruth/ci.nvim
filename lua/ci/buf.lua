@@ -304,18 +304,17 @@ end
 ---@param kind 'job'|'list'
 ---@param host string
 local function keymaps(buf, kind, host)
-  -- github alone exposes step boundaries, and github alone can be asked to
-  -- rerun or cancel
+  local be = forge.of(host)
+  -- github alone exposes step boundaries
   local github = forge.is_github(host)
-  local nouns = forge.of(host).nouns
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
     map(buf, '-', 'up', 'Go back to the list you came from')
     map(buf, 'R', 'refresh', 'Reload this buffer')
     map(buf, 'gX', 'web', 'Open in the browser')
-    if github then
-      map(buf, 'cr', 'rerun', ('Re-run this %s'):format(nouns.run))
-      map(buf, 'cc', 'cancel', ('Cancel this %s'):format(nouns.run))
+    if be.act then
+      map(buf, 'cr', 'rerun', ('Re-run this %s'):format(be.nouns.run))
+      map(buf, 'cc', 'cancel', ('Cancel this %s'):format(be.nouns.run))
     end
     if kind == 'job' then
       if github then

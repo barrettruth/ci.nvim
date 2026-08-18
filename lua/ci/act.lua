@@ -1,6 +1,5 @@
 local buf_util = require('ci.buf')
 local forge = require('ci.forge')
-local gh = require('ci.gh')
 local msg = require('ci.msg')
 
 local api = vim.api
@@ -182,7 +181,7 @@ local function send(buf, t, what, doing)
   -- By the time an answer comes back the current window is wherever you
   -- wandered to.
   local win = api.nvim_get_current_win()
-  gh.act(t.run, what, t.repo, function(err)
+  forge.of(t.host).act(t.run, what, t.repo, function(err)
     busy[buf] = nil
     if err then
       report('failed')
@@ -250,7 +249,7 @@ function M.rerun()
   end
   -- A log sees one job, so the rest of the run is asked for before the
   -- question can name a scope.
-  gh.run_jobs(t.run, nil, t.repo, function(found, err)
+  forge.of(t.host).run_jobs(t.run, nil, t.repo, function(found, err)
     if err or not found then
       busy[buf] = nil
       return msg.err(err or ('no jobs in %s %d'):format(noun(t.host), t.run))
