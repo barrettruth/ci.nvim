@@ -39,6 +39,19 @@ function M.check()
     })
   end
 
+  if vim.fn.executable('glab') == 1 then
+    local ok = probe('glab', { 'glab', 'auth', 'status' })
+    if ok then
+      vim.health.ok('glab found and authenticated')
+    elseif ok == false then
+      vim.health.warn('glab is not authenticated', { 'Run: glab auth login' })
+    end
+  else
+    vim.health.warn('glab not found on $PATH', {
+      'Needed for gitlab.com: https://gitlab.com/gitlab-org/cli',
+    })
+  end
+
   if vim.fn.executable('tea') == 1 then
     local ok = probe('tea', { 'tea', 'api', 'version' })
     if ok then

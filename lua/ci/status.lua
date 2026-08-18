@@ -48,7 +48,9 @@ local M = {}
 ---| 'timed_out'
 ---| 'action_required'
 
----@alias ci.Conclusion ci.gql.Conclusion|ci.rest.Conclusion
+--- `warning` is no forge's word. A job its forge was told it may fail is
+--- neither a pass nor a failure, and this is how it reaches attention.
+---@alias ci.Conclusion ci.gql.Conclusion|ci.rest.Conclusion|'warning'
 
 ---@type table<string, ci.Bucket>
 local BUCKET = {

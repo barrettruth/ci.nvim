@@ -22,6 +22,7 @@ local M = {}
 ---@field prefix? fun(raw: string): string?, string
 
 M.GITHUB = 'github.com'
+M.GITLAB = 'gitlab.com'
 
 local GIT = 2000
 
@@ -73,23 +74,40 @@ function M.is_github(host)
   return host == M.GITHUB or host:match('%.github%.com$') ~= nil
 end
 
---- Anything that is not github.com is assumed to speak Forgejo. A host `tea`
---- has no login for fails at the first request, which is a clearer error than
---- one invented here.
+--- gitlab.com by name, and nothing else: a gitlab an organisation hosts itself
+--- cannot be told from a Forgejo by its hostname, and there is nowhere to be
+--- told which it is.
+---@param host? string
+---@return boolean
+function M.is_gitlab(host)
+  return host == M.GITLAB or (host or ''):match('%.gitlab%.com$') ~= nil
+end
+
+--- Anything named neither github nor gitlab is assumed to speak Forgejo. A
+--- host `tea` has no login for fails at the first request, which is a clearer
+--- error than one invented here.
 ---@param host? string
 ---@return ci.Backend
 function M.of(host)
-  return M.is_github(host) and require('ci.gh') or require('ci.tea')
+  if M.is_github(host) then
+    return require('ci.gh')
+  end
+  return M.is_gitlab(host) and require('ci.glab') or require('ci.tea')
 end
 
 ---@param host? string
 ---@return string
 function M.cli(host)
-  return M.is_github(host) and 'gh' or 'tea'
+  if M.is_github(host) then
+    return 'gh'
+  end
+  return M.is_gitlab(host) and 'glab' or 'tea'
 end
 
---- The browser page behind `gX`. The two forges disagree on nearly every
---- path: `pull` against `pulls`, and no `/checks` suffix on Forgejo.
+--- The browser page behind `gX`. The three forges disagree on nearly every
+--- path: `pull` against `pulls` against `merge_requests`, no `/checks` suffix
+--- off github, and a `/-/` between the project and the noun on gitlab, which
+--- is what keeps a subgroup from being mistaken for one.
 ---@param host string
 ---@param repo string
 ---@param kind ci.Uri.Kind|'repo'
@@ -108,6 +126,16 @@ function M.web(host, repo, kind, id, attempt)
       return ('%s/commit/%s/checks'):format(base, id)
     end
     return base
+  end
+  if M.is_gitlab(host) then
+    if kind == 'pr' then
+      return ('%s/-/merge_requests/%s'):format(base, id)
+    elseif kind == 'run' then
+      return ('%s/-/pipelines/%s'):format(base, id)
+    elseif kind == 'checks' then
+      return ('%s/-/commit/%s'):format(base, id)
+    end
+    return ('%s/-/pipelines'):format(base)
   end
   -- A Forgejo run or job page is keyed on the run's index within the
   -- repository, which cannot be derived from the id its API answers to. Those
