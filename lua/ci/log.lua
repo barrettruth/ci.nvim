@@ -162,15 +162,48 @@ local function stamped(raw)
   return at, body
 end
 
+---@alias ci.log.Kind 'group'|'endgroup'|'error'|'warning'|'notice'|'debug'|'command'
+
+--- github's markers, and Forgejo's spelling of them. A forge that writes
+--- different ones says so itself.
+---@param body string
+---@return ci.log.Kind? kind
+---@return string? rest the text the marker introduces, always its own tail
+local function marked(body)
+  if body:match('^##%[endgroup%]') or body:match('^::endgroup::') then
+    return 'endgroup'
+  end
+  for _, name in ipairs({ 'group', 'error', 'warning', 'notice', 'debug' }) do
+    local rest = M.marker(body, name)
+    if rest then
+      return name, --[[@as ci.log.Kind]]
+        rest
+    end
+  end
+  local command = body:match('^%[command%](.*)$')
+  if command then
+    return 'command', command
+  end
+  return nil
+end
+
 --- Splits a job log into rows. Lines are kept whole, with an offset marking
---- the stamp and `##[...]` marker to conceal; steps come from the API
---- rather than the text, since a `run:` step logs its command, not its name.
+--- the stamp and the marker to conceal; steps come from the API rather than
+--- the text, since a `run:` step logs its command, not its name.
 ---@param text string
 ---@param steps ci.log.Step[]
----@param prefix? fun(raw: string): string?, string how this forge stamps a line
+---@param be? ci.Backend the forge whose log this is
 ---@return ci.log.Row[]
-function M.parse(text, steps, prefix)
-  prefix = prefix or stamped
+function M.parse(text, steps, be)
+  local prefix = be and be.prefix or stamped
+  local marks = be and be.marks or marked
+  -- Where a forge has no steps its groups are the outermost thing a log has,
+  -- so they take the level steps would otherwise hold and `]]` reaches them.
+  ---@type ci.log.Fold, ci.log.Fold, ci.log.Fold
+  local opener, inner, outer = '>2', '2', '1'
+  if #steps == 0 then
+    opener, inner, outer = '>1', '1', '0'
+  end
   ---@type ci.log.Row[]
   local rows = {}
   local step_i, in_group = 0, false
@@ -211,7 +244,11 @@ function M.parse(text, steps, prefix)
 
   ---@type ci.Hl?
   local annot
-  for raw in (text .. '\n'):gmatch('([^\n]*)\n') do
+  for line in (text .. '\n'):gmatch('([^\n]*)\n') do
+    -- A runner that erases to end of line after a marker leaves the escape,
+    -- the carriage return before it, and sometimes a note that it would like
+    -- the section folded. None of the three means anything in a buffer.
+    local raw = line:gsub('%[collapsed=true%]\r\27%[0K$', ''):gsub('\r\27%[0K$', ''):gsub('\r$', '')
     local at, body = prefix(raw)
 
     if at then
@@ -221,15 +258,9 @@ function M.parse(text, steps, prefix)
       end
     end
 
-    local group = M.marker(body, 'group')
-    local endgroup = body:match('^##%[endgroup%]') or body:match('^::endgroup::')
-    local err = M.marker(body, 'error')
-    local warn = M.marker(body, 'warning')
-    local notice = M.marker(body, 'notice')
-    local debug = M.marker(body, 'debug')
-    local command = body:match('^%[command%](.*)$')
+    local kind, rest = marks(body)
 
-    if not endgroup then
+    if kind ~= 'endgroup' then
       flush()
     end
 
@@ -238,36 +269,37 @@ function M.parse(text, steps, prefix)
     -- A marker's body may run on for many lines, and only the first carries
     -- a timestamp. github.com bands the whole block, so the severity is held
     -- until a stamped line ends it.
+    local here = in_group and inner or outer
     if at then
       annot = nil
     elseif annot then
-      emit(raw, in_group and '2' or '1', annot, nil, 0, nil, true)
+      emit(raw, here, annot, nil, 0, nil, true)
       goto continue
     end
 
-    if endgroup then
+    if kind == 'endgroup' then
       in_group = false
-    elseif group then
+    elseif kind == 'group' then
       in_group = true
-      emit(raw, '>2', 'CiGroup', nil, ts + #body - #group)
-    elseif err then
+      emit(raw, opener, 'CiGroup', nil, ts + #body - #rest)
+    elseif kind == 'error' then
       in_group = false
       annot = 'CiFail'
-      emit(raw, '1', 'CiFail', nil, ts + #body - #err, 'Error: ')
-    elseif warn then
+      emit(raw, outer, 'CiFail', nil, ts + #body - #rest, 'Error: ')
+    elseif kind == 'warning' then
       annot = 'CiAttention'
-      emit(raw, in_group and '2' or '1', 'CiAttention', nil, ts + #body - #warn, 'Warning: ')
-    elseif notice then
-      emit(raw, in_group and '2' or '1', 'CiPending', nil, ts + #body - #notice, 'Notice: ')
-    elseif debug then
+      emit(raw, here, 'CiAttention', nil, ts + #body - #rest, 'Warning: ')
+    elseif kind == 'notice' then
+      emit(raw, here, 'CiPending', nil, ts + #body - #rest, 'Notice: ')
+    elseif kind == 'debug' then
       -- The marker stays. Every other one is concealed because a word takes
       -- its place; this one would leave nothing behind, and a colour alone
       -- cannot be relied on to say which lines were debugging output.
-      emit(raw, in_group and '2' or '1', 'CiDebug', nil, ts)
-    elseif command then
-      emit(raw, in_group and '2' or '1', 'CiCommand', nil, ts + #body - #command)
+      emit(raw, here, 'CiDebug', nil, ts)
+    elseif kind == 'command' then
+      emit(raw, here, 'CiCommand', nil, ts + #body - #rest)
     elseif body ~= '' or #rows > 0 then
-      emit(raw, in_group and '2' or '1', nil, nil, ts)
+      emit(raw, here, nil, nil, ts)
     end
     ::continue::
   end
@@ -508,7 +540,7 @@ function M.render(buf, gen, u)
       return
     end
     local be = forge.of(u.host)
-    local rows = M.parse(text, usable_steps(job.steps), be.prefix)
+    local rows = M.parse(text, usable_steps(job.steps), be)
     levels[buf] = vim.tbl_map(function(r)
       return r.fold
     end, rows)

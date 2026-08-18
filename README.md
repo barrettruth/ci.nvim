@@ -76,7 +76,7 @@ job steps with `[[` and `]]`, and more.
 ## Known limitations
 
 - **In-progress jobs (GitHub)**: gh [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their step status only, until completion.
-- **Steps and folds (GitLab)**: jobs have no steps and logs carry no group markers, so a job log does not fold and `[[`/`]]` have nothing to move between.
+- **Steps (GitLab)**: jobs have no steps, so a log's own sections fold in their place and `[[`/`]]` move between sections. Nothing folds beneath them.
 - **Stages (GitLab)**: a checks list names no stage, because a commit's statuses do not carry one. A pipeline's own job list does.
 - **Re-run and cancel (GitLab)**: retrying a pipeline reaches its failed and canceled jobs and no others, so `cr` on a green pipeline says so rather than asking. A cancel under way cannot be hurried, so a second `cc` says that rather than offering a force GitLab does not have.
 - **Revisions (GitLab)**: not resolved by the server, so `:CI {rev}` takes a branch, tag or SHA, and `:CI HEAD` is answered locally.

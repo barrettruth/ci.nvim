@@ -21,6 +21,7 @@ local M = {}
 ---@field run? fun(id: integer, repo?: string, on_done: fun(run?: ci.tea.Run, err?: string))
 ---@field finished? fun(text: string): boolean
 ---@field prefix? fun(raw: string): string?, string
+---@field marks? fun(body: string): ci.log.Kind?, string?
 
 M.GITHUB = 'github.com'
 M.GITLAB = 'gitlab.com'

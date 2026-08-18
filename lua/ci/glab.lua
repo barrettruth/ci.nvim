@@ -29,6 +29,26 @@ function M.prefix(raw)
   return at, body
 end
 
+--- A section marker is the whole of its line, and the name inside it is the
+--- only thing a fold has to go by. gitlab writes no severity markers at all,
+--- so a failure is red prose and nothing more.
+---@param body string
+---@return ci.log.Kind? kind
+---@return string? rest
+function M.marks(body)
+  local line = (body:gsub('^\27%[0K', ''))
+  local verb, name = line:match('^section_(%a+):%d+:([%w_%.%-]+)')
+  if verb == 'end' then
+    return 'endgroup'
+  end
+  if verb ~= 'start' then
+    return nil
+  end
+  -- The runner sometimes puts the first line of the section after the marker
+  -- rather than under it, and that reads better than the name would.
+  return 'group', line:match('\r\27%[0K(.+)$') or name
+end
+
 --- A runner closes every log with one of these, so their absence is the only
 --- signal that a job is still writing.
 ---@param text string
