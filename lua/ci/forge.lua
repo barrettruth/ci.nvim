@@ -19,6 +19,7 @@ local M = {}
 ---@field run_by_index? fun(index: integer, repo?: string, on_done: fun(run?: ci.tea.Run, err?: string))
 ---@field run? fun(id: integer, repo?: string, on_done: fun(run?: ci.tea.Run, err?: string))
 ---@field finished? fun(text: string): boolean
+---@field prefix? fun(raw: string): string?, string
 
 M.GITHUB = 'github.com'
 

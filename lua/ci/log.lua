@@ -149,13 +149,28 @@ end
 ---@field cont? boolean
 ---@field time? string
 
+--- The common shape: an ISO timestamp, a space, the line. A forge that stamps
+--- its lines with more than that supplies its own.
+---@param raw string
+---@return string? at
+---@return string body
+local function stamped(raw)
+  local at, body = raw:match(TS)
+  if not at then
+    return nil, raw
+  end
+  return at, body
+end
+
 --- Splits a job log into rows. Lines are kept whole, with an offset marking
---- the timestamp and `##[...]` marker to conceal; steps come from the API
+--- the stamp and `##[...]` marker to conceal; steps come from the API
 --- rather than the text, since a `run:` step logs its command, not its name.
 ---@param text string
 ---@param steps ci.log.Step[]
+---@param prefix? fun(raw: string): string?, string how this forge stamps a line
 ---@return ci.log.Row[]
-function M.parse(text, steps)
+function M.parse(text, steps, prefix)
+  prefix = prefix or stamped
   ---@type ci.log.Row[]
   local rows = {}
   local step_i, in_group = 0, false
@@ -197,10 +212,7 @@ function M.parse(text, steps)
   ---@type ci.Hl?
   local annot
   for raw in (text .. '\n'):gmatch('([^\n]*)\n') do
-    local at, body = raw:match(TS)
-    if not at then
-      at, body = nil, raw
-    end
+    local at, body = prefix(raw)
 
     if at then
       while step_i < #steps and steps[step_i + 1].at <= at do
@@ -495,7 +507,8 @@ function M.render(buf, gen, u)
     if failed or not job or not text or not buf_util.current(buf, gen) then
       return
     end
-    local rows = M.parse(text, usable_steps(job.steps))
+    local be = forge.of(u.host)
+    local rows = M.parse(text, usable_steps(job.steps), be.prefix)
     levels[buf] = vim.tbl_map(function(r)
       return r.fold
     end, rows)
@@ -508,7 +521,6 @@ function M.render(buf, gen, u)
     end
     -- A forge that serves a running job's log has to say when it stopped
     -- growing; GitHub never gets here until the job is over.
-    local be = forge.of(u.host)
     if be.finished and not be.finished(text) then
       vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true })
       buf_util.watch(buf)
