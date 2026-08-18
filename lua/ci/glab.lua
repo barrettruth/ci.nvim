@@ -8,6 +8,12 @@ local LOG = 30000
 ---@type ci.Nouns
 M.nouns = { run = 'pipeline', group = 'stage' }
 
+--- Retrying reaches the failed and canceled jobs and no others, and a cancel
+--- already under way cannot be hurried, so neither of the other two would do
+--- anything but report that it had.
+---@type table<ci.gh.Act, boolean>
+M.acts = { ['rerun-failed-jobs'] = true, cancel = true }
+
 --- A stamped log line is a timestamp, two hex flags, the stream it came from,
 --- and a space, or a plus where the line continues one already begun.
 local TS = '^(%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%d)%.%d+Z %x%x[OE][ +](.*)$'

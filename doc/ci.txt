@@ -233,9 +233,10 @@ A GitLab pipeline lists the child pipelines it triggers alongside its own
 jobs. They have no log of their own, so `<CR>` opens the pipeline each one
 triggered.
 
-Retrying a GitLab pipeline retries its failed and canceled jobs, and does
-nothing where it has none. Cancelling reports success whatever state the
-pipeline is in, so a second `cc` cannot force one already under way.
+Retrying a GitLab pipeline reaches its failed and canceled jobs and no others.
+Where none of them failed, `cr` says so rather than asking. A cancel already
+under way cannot be hurried either, so a second `cc` says that rather than
+offering a force GitLab does not have.
 
 GitLab does not resolve revisions remotely either, so `:CI {rev}` takes a
 branch, a tag or a SHA, and `:CI HEAD` is answered locally.

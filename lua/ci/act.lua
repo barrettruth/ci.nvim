@@ -35,6 +35,15 @@ local function noun(host)
   return forge.of(host).nouns.run
 end
 
+--- Whether {t}'s forge takes {what}. A backend that names none takes all four.
+---@param t ci.act.Target
+---@param what ci.gh.Act
+---@return boolean
+local function takes(t, what)
+  local acts = forge.of(t.host).acts
+  return acts == nil or acts[what] == true
+end
+
 --- What the two keys act on, or the reason they cannot. Read at the keypress,
 --- because a list re-sorts itself worst-first on every poll and the question
 --- that follows is a callback.
@@ -223,6 +232,10 @@ end
 local function offer(buf, t)
   local what, n = M.scope(t.rows or {})
   local run_noun = noun(t.host)
+  if not takes(t, what) then
+    busy[buf] = nil
+    return msg.warn(('nothing in this %s failed, and it re-runs only what did'):format(run_noun))
+  end
   local prompt = n > 0
       and ('Re-run %s in %s %d%s? [y/N] '):format(
         jobs(n, what == 'rerun-failed-jobs'),
@@ -271,6 +284,10 @@ function M.cancel()
   end
   local run_noun = noun(t.host)
   local force = asked[t.run] or false
+  if force and not takes(t, 'force-cancel') then
+    busy[buf] = nil
+    return msg.warn(('this %s is already cancelling'):format(run_noun))
+  end
   local prompt = force
       and ('%s %d%s is still cancelling. Force cancel? [y/N] '):format(
         (run_noun:gsub('^%l', string.upper)),
