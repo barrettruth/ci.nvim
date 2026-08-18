@@ -163,6 +163,11 @@ function M.paint(hl, text)
   return ('%%#%s#%s%%*'):format(hl, text)
 end
 
+--- What the summary calls a bucket whose own name is not a word for a count.
+--- The rest read as they are: "3 fail, 2 running, 1 skipped".
+---@type table<ci.Bucket, string>
+local LABEL = { attention = 'needs attention' }
+
 ---@param counts table<ci.Bucket, integer>
 ---@param total integer
 ---@return string
@@ -173,7 +178,7 @@ function M.summary(counts, total)
   local parts = {}
   for _, b in ipairs({ 'fail', 'attention', 'running', 'pending', 'skipped' }) do
     if (counts[b] or 0) > 0 then
-      parts[#parts + 1] = M.paint(M.hl[b], ('%d %s'):format(counts[b], b))
+      parts[#parts + 1] = M.paint(M.hl[b], ('%d %s'):format(counts[b], LABEL[b] or b))
     end
   end
   if #parts == 0 then
