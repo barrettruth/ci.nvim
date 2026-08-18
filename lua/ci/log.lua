@@ -212,6 +212,9 @@ function M.parse(text, steps, be)
   ---@type ci.log.Row[]
   local rows = {}
   local step_i, nest = 0, 0
+  --- Set by a group marker that carried no words of its own: the next line to
+  --- be drawn is the heading, and heads the fold in the marker's place.
+  local heading = false
   ---@type integer[]
   local pending = {}
 
@@ -292,10 +295,15 @@ function M.parse(text, steps, be)
     end
 
     if kind == 'endgroup' then
+      heading = false
       nest = math.max(0, nest - 1)
     elseif kind == 'group' then
       nest = nest + 1
-      emit(raw, level(nest, true), 'CiGroup', nil, ts + #body - #rest)
+      if rest then
+        emit(raw, level(nest, true), 'CiGroup', nil, ts + #body - #rest)
+      else
+        heading = true
+      end
     elseif kind == 'error' then
       nest = 0
       annot = 'CiFail'
@@ -312,6 +320,9 @@ function M.parse(text, steps, be)
       emit(raw, here, 'CiDebug', nil, ts)
     elseif kind == 'command' then
       emit(raw, here, 'CiCommand', nil, ts + #body - #rest)
+    elseif heading then
+      heading = false
+      emit(raw, level(nest, true), 'CiGroup', nil, ts)
     elseif body ~= '' or #rows > 0 then
       emit(raw, here, nil, nil, ts)
     end

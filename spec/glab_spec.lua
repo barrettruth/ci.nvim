@@ -22,10 +22,10 @@ describe('glab.prefix', function()
 end)
 
 describe('glab.marks', function()
-  it('names a section after the marker that is its whole line', function()
+  it('leaves a bare marker with no words of its own', function()
     local kind, rest = glab.marks('section_start:1787024369:step_script')
     assert.same('group', kind)
-    assert.same('step_script', rest)
+    assert.is_nil(rest)
   end)
 
   it('prefers the text a marker introduces to the name inside it', function()
@@ -48,8 +48,10 @@ describe('log.parse on a forge with no steps', function()
   it('folds a section, and one inside it a level deeper', function()
     local text = table.concat({
       stamped('section_start:1:outer'),
+      stamped('Preparing'),
       stamped('a'),
       stamped('section_start:2:inner'),
+      stamped('Running'),
       stamped('b'),
       stamped('section_end:3:inner'),
       stamped('section_end:4:outer'),
@@ -61,8 +63,27 @@ describe('log.parse on a forge with no steps', function()
     assert.same({ '>1', '1', '>2', '2' }, folds)
   end)
 
-  it('conceals the marker and shows the name', function()
-    local rows = log.parse(stamped('section_start:1:step_script'), {}, glab)
-    assert.same('step_script', rows[1].text:sub(rows[1].conceal + 1))
+  it('heads a fold with the words beneath the marker, not the name inside it', function()
+    local text = stamped('section_start:1:cleanup_file_variables')
+      .. '\n'
+      .. stamped('Cleaning up project directory and file based variables')
+    local rows = log.parse(text, {}, glab)
+    assert.same(1, #rows)
+    assert.same('>1', rows[1].fold)
+    assert.same(
+      'Cleaning up project directory and file based variables',
+      rows[1].text:sub(rows[1].conceal + 1)
+    )
+  end)
+
+  it('opens no fold where a section closed before it said anything', function()
+    local text = stamped('section_start:1:empty')
+      .. '\n'
+      .. stamped('section_end:2:empty')
+      .. '\n'
+      .. stamped('after')
+    local rows = log.parse(text, {}, glab)
+    assert.same(1, #rows)
+    assert.same('0', rows[1].fold)
   end)
 end)

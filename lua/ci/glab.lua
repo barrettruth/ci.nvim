@@ -29,24 +29,24 @@ function M.prefix(raw)
   return at, body
 end
 
---- A section marker is the whole of its line, and the name inside it is the
---- only thing a fold has to go by. gitlab writes no severity markers at all,
+--- The name inside a section marker is the runner's, not a reader's, and
+--- gitlab.com shows the words beneath it instead. So a marker carrying its own
+--- words heads the fold with those, and a bare one heads it with nothing and
+--- leaves the line below to do it. gitlab writes no severity markers at all,
 --- so a failure is red prose and nothing more.
 ---@param body string
 ---@return ci.log.Kind? kind
 ---@return string? rest
 function M.marks(body)
   local line = (body:gsub('^\27%[0K', ''))
-  local verb, name = line:match('^section_(%a+):%d+:([%w_%.%-]+)')
+  local verb = line:match('^section_(%a+):%d+:[%w_%.%-]+')
   if verb == 'end' then
     return 'endgroup'
   end
   if verb ~= 'start' then
     return nil
   end
-  -- The runner sometimes writes the section's first line after the marker
-  -- rather than under it.
-  return 'group', line:match('\r\27%[0K(.+)$') or name
+  return 'group', line:match('\r\27%[0K(.+)$')
 end
 
 --- A runner closes every log with one of these, so their absence is the only
