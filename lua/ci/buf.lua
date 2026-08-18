@@ -305,8 +305,6 @@ end
 ---@param host string
 local function keymaps(buf, kind, host)
   local be = forge.of(host)
-  -- github alone exposes step boundaries
-  local github = forge.is_github(host)
   api.nvim_buf_call(buf, function()
     map(buf, 'g?', 'help', 'ci.nvim mappings', { nowait = true })
     map(buf, '-', 'up', 'Go back to the list you came from')
@@ -317,10 +315,8 @@ local function keymaps(buf, kind, host)
       map(buf, 'cc', 'cancel', ('Cancel this %s'):format(be.nouns.run))
     end
     if kind == 'job' then
-      if github then
-        map(buf, ']]', 'next-step', 'Go to the next step')
-        map(buf, '[[', 'prev-step', 'Go to the previous step')
-      end
+      map(buf, ']]', 'next-step', 'Go to the next step')
+      map(buf, '[[', 'prev-step', 'Go to the previous step')
       map(buf, 'gS', 'timestamps', 'Toggle the timestamp column')
     end
     if kind == 'list' then
