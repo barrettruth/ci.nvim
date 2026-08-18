@@ -40,6 +40,15 @@ local function slug(repo)
   return o .. '/' .. n
 end
 
+--- " on owner/name", or nothing at all where gh is resolving the repository
+--- itself: its placeholders stand in for a name only gh knows, and a reader
+--- shown `{owner}/{repo}` learns less than one shown nothing.
+---@param repo? string
+---@return string
+local function where(repo)
+  return (repo and repo ~= '') and (' on ' .. repo) or ''
+end
+
 --- What github said, if {s} is one of its error envelopes.
 ---@param s string
 ---@return string?
@@ -288,7 +297,7 @@ function M.rollup(expr, repo, on_done)
     local first = (pages or {})[1]
     local obj = vim.tbl_get(first or {}, 'repository', 'object')
     if not obj or not obj.oid then
-      return on_done(nil, ('no such revision on %s: %s'):format(slug(repo), expr))
+      return on_done(nil, ('no such revision%s: %s'):format(where(repo), expr))
     end
     ---@type ci.gh.RollupNode[]
     local nodes = {}
@@ -375,7 +384,7 @@ function M.pr_by_number(number, repo, on_done)
     end
     local pr = vim.tbl_get(data or {}, 'repository', 'pullRequest')
     if not pr then
-      return on_done(nil, ('no pull request #%d on %s'):format(number, slug(repo)))
+      return on_done(nil, ('no pull request #%d%s'):format(number, where(repo)))
     end
     on_done(pr)
   end)

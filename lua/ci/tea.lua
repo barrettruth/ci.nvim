@@ -29,6 +29,15 @@ local function slug(repo)
   return (o or '{owner}') .. '/' .. (n or '{repo}')
 end
 
+--- " on owner/name", or nothing at all where tea is resolving the repository
+--- itself: its placeholders stand in for a name only tea knows, and a reader
+--- shown `{owner}/{repo}` learns less than one shown nothing.
+---@param repo? string
+---@return string
+local function where(repo)
+  return (repo and repo ~= '') and (' on ' .. repo) or ''
+end
+
 ---@param r vim.SystemCompleted
 ---@return string
 local function errmsg(r)
@@ -308,7 +317,7 @@ function M.pr_by_number(number, repo, on_done)
       return on_done(nil, err)
     end
     if not data or not data.number then
-      return on_done(nil, ('no pull request #%d on %s'):format(number, slug(repo)))
+      return on_done(nil, ('no pull request #%d%s'):format(number, where(repo)))
     end
     on_done({
       number = data.number,
@@ -400,7 +409,7 @@ function M.run_by_index(index, repo, on_done)
         return on_done(r)
       end
     end
-    on_done(nil, ('run %d is not among the last %d on %s'):format(index, RUN_SCAN, slug(repo)))
+    on_done(nil, ('run %d is not among the last %d%s'):format(index, RUN_SCAN, where(repo)))
   end)
 end
 
