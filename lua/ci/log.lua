@@ -197,16 +197,21 @@ end
 function M.parse(text, steps, be)
   local prefix = be and be.prefix or stamped
   local marks = be and be.marks or marked
-  -- Where a forge has no steps its groups are the outermost thing a log has,
-  -- so they take the level steps would otherwise hold and `]]` reaches them.
-  ---@type ci.log.Fold, ci.log.Fold, ci.log.Fold
-  local opener, inner, outer = '>2', '2', '1'
-  if #steps == 0 then
-    opener, inner, outer = '>1', '1', '0'
+  -- A step holds the first fold level on a forge that has steps; where one has
+  -- none its groups take that level instead, and `]]` reaches them.
+  local base = #steps > 0 and 1 or 0
+
+  --- The level {d} groups deep, opening a fold when {open}. Two is as deep as
+  --- one goes, so a group nested below that joins the one above it.
+  ---@param d integer
+  ---@param open? boolean
+  ---@return ci.log.Fold
+  local function level(d, open)
+    return ((open and '>%d' or '%d'):format(math.min(base + d, 2))) --[[@as ci.log.Fold]]
   end
   ---@type ci.log.Row[]
   local rows = {}
-  local step_i, in_group = 0, false
+  local step_i, nest = 0, 0
   ---@type integer[]
   local pending = {}
 
@@ -232,7 +237,7 @@ function M.parse(text, steps, be)
     if #pending == 0 then
       return
     end
-    in_group = false
+    nest = 0
     for _, si in ipairs(pending) do
       local s = steps[si]
       local sym, hl = status.of(s.status, s.conclusion)
@@ -269,7 +274,7 @@ function M.parse(text, steps, be)
     -- A marker's body may run on for many lines, and only the first carries
     -- a timestamp. github.com bands the whole block, so the severity is held
     -- until a stamped line ends it.
-    local here = in_group and inner or outer
+    local here = level(nest)
     if at then
       annot = nil
     elseif annot then
@@ -278,14 +283,14 @@ function M.parse(text, steps, be)
     end
 
     if kind == 'endgroup' then
-      in_group = false
+      nest = math.max(0, nest - 1)
     elseif kind == 'group' then
-      in_group = true
-      emit(raw, opener, 'CiGroup', nil, ts + #body - #rest)
+      nest = nest + 1
+      emit(raw, level(nest, true), 'CiGroup', nil, ts + #body - #rest)
     elseif kind == 'error' then
-      in_group = false
+      nest = 0
       annot = 'CiFail'
-      emit(raw, outer, 'CiFail', nil, ts + #body - #rest, 'Error: ')
+      emit(raw, level(0), 'CiFail', nil, ts + #body - #rest, 'Error: ')
     elseif kind == 'warning' then
       annot = 'CiAttention'
       emit(raw, here, 'CiAttention', nil, ts + #body - #rest, 'Warning: ')
