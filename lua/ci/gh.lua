@@ -272,10 +272,10 @@ query($owner:String!,$repo:String!,$head:String!){
 ---@field number integer
 ---@field title string
 ---@field headRefOid string
+---@field repo? string where its checks live, when that is not the repository asked
 
 ---@class ci.gh.BranchPr : ci.gh.Pr
 ---@field headRepositoryOwner? { login: string }
----@field repo? string
 
 --- Finds the open PR for {branch}. A fork PR lives on the base repository,
 --- where the branch name may not be unique, so the viewer's own PR wins.

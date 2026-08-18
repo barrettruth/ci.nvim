@@ -164,10 +164,12 @@ function M.render(buf, gen, u)
       if err then
         return buf_util.fail(buf, err)
       end
+      -- A pull request from a fork keeps its checks on the fork, while the
+      -- page that names it stays on the repository it targets.
       from_rollup(
         buf,
         gen,
-        u.repo,
+        pr.repo or u.repo,
         pr.headRefOid,
         pr.title,
         forge.web(u.host, u.repo, 'pr', pr.number),
