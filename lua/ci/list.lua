@@ -201,8 +201,9 @@ function M.render(buf, gen, u)
         end
         local checks = jobs_to_checks(jobs, u, page)
         local text = summarize(checks)
-        local label = u.attempt and ('run %d (attempt %d)'):format(n, u.attempt)
-          or ('run %d'):format(n)
+        local noun = forge.of(u.host).nouns.run
+        local label = u.attempt and ('%s %d (attempt %d)'):format(noun, n, u.attempt)
+          or ('%s %d'):format(noun, n)
         paint(buf, gen, u.repo, text, label, checks)
         local sha = jobs[1] and jobs[1].head_sha
         vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, {
