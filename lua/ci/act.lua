@@ -22,7 +22,8 @@ local busy = {}
 
 ---@class ci.act.Target
 ---@field run integer
----@field repo string
+---@field repo string the repository the run lives in, which for a fork is not
+--- the one the view is named for
 ---@field host string
 ---@field label string the group, when the view names one
 ---@field rows? ci.Check[] what the view shows of this run
@@ -47,7 +48,7 @@ function M.target(u, b, lnum)
     if not b.run_id then
       return nil, ('this job does not name a %s'):format(noun(u.host))
     end
-    return { run = b.run_id, repo = u.repo, host = u.host, label = b.group or '' }
+    return { run = b.run_id, repo = b.repo, host = u.host, label = b.group or '' }
   end
 
   ---@type ci.Check[]
@@ -70,7 +71,7 @@ function M.target(u, b, lnum)
     end
     return {
       run = run,
-      repo = u.repo,
+      repo = b.repo,
       host = u.host,
       label = rows[1] and rows[1].group or '',
       rows = rows,
@@ -93,7 +94,7 @@ function M.target(u, b, lnum)
   end
   return {
     run = check.run_id,
-    repo = u.repo,
+    repo = b.repo,
     host = u.host,
     label = check.group or '',
     rows = rows,
@@ -164,7 +165,7 @@ local function after(buf, t, what, win)
   local rerun = what == 'rerun' or what == 'rerun-failed-jobs'
   if u and u.kind == 'job' and rerun and api.nvim_win_get_buf(win) == buf then
     return api.nvim_win_call(win, function()
-      buf_util.open(('ci://%s/%s/run/%d'):format(u.host, u.repo, t.run), { keepalt = true })
+      buf_util.open(('ci://%s/%s/run/%d'):format(u.host, t.repo, t.run), { keepalt = true })
       buf_util.nudge(api.nvim_get_current_buf())
     end)
   end
