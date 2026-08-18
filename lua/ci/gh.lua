@@ -371,19 +371,30 @@ function M.job_log(id, repo, on_done)
   end, LOG)
 end
 
+--- Every page of them. An attempt's jobs were asked for without a page size at
+--- all, so a rerun of more than thirty jobs lost the rest, and `--paginate`
+--- over an endpoint answering with an object writes one object a page, which
+--- is not one document until `--slurp` wraps them.
 ---@param id integer
 ---@param attempt? integer
 ---@param repo? string
 ---@param on_done fun(jobs?: ci.gh.Job[], err?: string)
 function M.run_jobs(id, attempt, repo, on_done)
   local path = attempt
-      and ('repos/%s/actions/runs/%d/attempts/%d/jobs'):format(slug(repo), id, attempt)
+      and ('repos/%s/actions/runs/%d/attempts/%d/jobs?per_page=100'):format(slug(repo), id, attempt)
     or ('repos/%s/actions/runs/%d/jobs?per_page=100'):format(slug(repo), id)
-  return api({ path }, function(data, err)
+  return api({ '--paginate', '--slurp', path }, function(pages, err)
     if err then
       return on_done(nil, err)
     end
-    on_done(data.jobs or {})
+    ---@type ci.gh.Job[]
+    local jobs = {}
+    for _, page in ipairs(pages or {}) do
+      for _, j in ipairs(page.jobs or {}) do
+        jobs[#jobs + 1] = j
+      end
+    end
+    on_done(jobs)
   end)
 end
 
