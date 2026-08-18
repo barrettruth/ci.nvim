@@ -26,6 +26,19 @@ describe('status.bucket', function()
     end
   end)
 
+  it('buckets every gitlab job status', function()
+    assert.equals('fail', status.bucket('failed', nil))
+    assert.equals('skipped', status.bucket('canceled', nil))
+    assert.equals('running', status.bucket('canceling', nil))
+    for _, s in ipairs({ 'created', 'waiting_for_resource', 'preparing', 'manual', 'scheduled' }) do
+      assert.equals('pending', status.bucket(s, nil))
+    end
+  end)
+
+  it('reports a failure that was allowed as needing attention', function()
+    assert.equals('attention', status.bucket('failed', 'warning'))
+  end)
+
   it('defaults unknown values to pending rather than passing', function()
     assert.equals('pending', status.bucket(nil, 'SOMETHING_NEW'))
     assert.equals('pending', status.bucket(nil, nil))

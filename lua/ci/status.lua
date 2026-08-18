@@ -8,7 +8,22 @@ local M = {}
 ---@alias ci.gql.Status 'REQUESTED'|'QUEUED'|'IN_PROGRESS'|'COMPLETED'|'WAITING'|'PENDING'
 ---@alias ci.rest.Status 'requested'|'queued'|'in_progress'|'completed'|'waiting'|'pending'
 ---@alias ci.forgejo.Status 'unknown'|'success'|'failure'|'cancelled'|'skipped'|'waiting'|'running'|'blocked'
----@alias ci.Status ci.gql.Status|ci.rest.Status|ci.forgejo.Status
+
+---@alias ci.gitlab.Status
+---| 'created'
+---| 'waiting_for_resource'
+---| 'preparing'
+---| 'pending'
+---| 'running'
+---| 'success'
+---| 'failed'
+---| 'canceled'
+---| 'canceling'
+---| 'skipped'
+---| 'manual'
+---| 'scheduled'
+
+---@alias ci.Status ci.gql.Status|ci.rest.Status|ci.forgejo.Status|ci.gitlab.Status
 
 ---@alias ci.gql.Conclusion
 ---| 'SUCCESS'
@@ -40,6 +55,7 @@ local BUCKET = {
   success = 'pass',
 
   failure = 'fail',
+  failed = 'fail',
   startup_failure = 'fail',
   timed_out = 'fail',
   error = 'fail',
@@ -49,19 +65,29 @@ local BUCKET = {
 
   in_progress = 'running',
   running = 'running',
+  canceling = 'running',
 
   queued = 'pending',
   requested = 'pending',
   waiting = 'pending',
+  waiting_for_resource = 'pending',
   pending = 'pending',
   expected = 'pending',
   blocked = 'pending',
   unknown = 'pending',
+  created = 'pending',
+  preparing = 'pending',
+  scheduled = 'pending',
+  -- A manual job waits to be asked for, and ranking it any higher would put
+  -- every optional deploy above the jobs that are actually running.
+  manual = 'pending',
 
   skipped = 'skipped',
   neutral = 'skipped',
   stale = 'skipped',
   cancelled = 'skipped',
+  -- gitlab spells it with one l
+  canceled = 'skipped',
 }
 
 ---@type table<ci.Bucket, string>
@@ -94,7 +120,7 @@ M.rank = {
   skipped = 6,
 }
 
---- Collapses GitHub's twenty status and conclusion values. Unknown ones are
+--- Collapses every forge's status and conclusion values. Unknown ones are
 --- pending, never passing, since the enums are open.
 ---@param status? string
 ---@param conclusion? string
