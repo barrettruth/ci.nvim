@@ -91,6 +91,34 @@ describe('target.parse', function()
     )
   end)
 
+  it('reads GitLab URLs, subgroups and all', function()
+    local GL = 'https://gitlab.com/g/s/p'
+    assert.same(
+      { kind = 'run', host = 'gitlab.com', repo = 'g/s/p', id = 11 },
+      target.parse(GL .. '/-/pipelines/11')
+    )
+    assert.same(
+      { kind = 'job', host = 'gitlab.com', repo = 'g/s/p', id = 22 },
+      target.parse(GL .. '/-/jobs/22')
+    )
+    assert.same(
+      { kind = 'pr', host = 'gitlab.com', repo = 'g/s/p', number = 7 },
+      target.parse(GL .. '/-/merge_requests/7')
+    )
+    assert.same(
+      { kind = 'pr', host = 'gitlab.com', repo = 'g/s/p', number = 7 },
+      target.parse(GL .. '/-/merge_requests/7/pipelines')
+    )
+    assert.same(
+      { kind = 'rev', host = 'gitlab.com', repo = 'g/s/p', expr = 'abc123' },
+      target.parse(GL .. '/-/commit/abc123')
+    )
+    assert.same(
+      { kind = 'repo', host = 'gitlab.com', repo = 'g/s/p' },
+      target.parse(GL .. '/-/pipelines')
+    )
+  end)
+
   it('rejects what it cannot serve', function()
     assert.is_nil(target.parse(GH .. '/blob/main/README.md'))
     assert.is_nil(target.parse('https://gitlab.com/o/r'))
@@ -119,5 +147,13 @@ describe('forge.host', function()
     assert.is_true(forge.is_github('github.com'))
     assert.is_false(forge.is_github('forge.example.com'))
     assert.is_false(forge.is_github('notgithub.com'))
+  end)
+
+  it('knows gitlab only by name', function()
+    assert.is_true(forge.is_gitlab('gitlab.com'))
+    assert.is_true(forge.is_gitlab('team.gitlab.com'))
+    assert.is_false(forge.is_gitlab('notgitlab.com'))
+    assert.is_false(forge.is_gitlab('gitlab.example.com'))
+    assert.is_false(forge.is_gitlab(nil))
   end)
 end)

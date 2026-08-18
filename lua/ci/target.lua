@@ -148,6 +148,49 @@ local function parse_github(url)
   return nil, ('unsupported GitHub URL: %s'):format(url)
 end
 
+--- gitlab writes `/-/` between a project and the noun that follows it, which
+--- is the only thing telling a subgroup from a noun.
+---@param url string
+---@param host string
+---@return ci.Target?
+---@return string? err
+local function parse_gitlab(url, host)
+  local path = split_url(url)
+  if not path or path == '' then
+    return nil
+  end
+  local repo, rest = path:match('^(.-)/%-/(.*)$')
+  if not repo then
+    return nil, ('unsupported GitLab URL: %s'):format(url)
+  end
+
+  local job = rest:match('^jobs/(%d+)$')
+  if job then
+    return { kind = 'job', host = host, repo = repo, id = tonumber(job) }
+  end
+
+  local pipeline = rest:match('^pipelines/(%d+)$')
+  if pipeline then
+    return { kind = 'run', host = host, repo = repo, id = tonumber(pipeline) }
+  end
+
+  local mr = rest:match('^merge_requests/(%d+)')
+  if mr then
+    return { kind = 'pr', host = host, repo = repo, number = tonumber(mr) }
+  end
+
+  local sha = rest:match('^commit/(%x+)$')
+  if sha then
+    return { kind = 'rev', host = host, repo = repo, expr = sha }
+  end
+
+  if rest == 'pipelines' then
+    return { kind = 'repo', host = host, repo = repo }
+  end
+
+  return nil, ('unsupported GitLab URL: %s'):format(url)
+end
+
 ---@param arg? string
 ---@return ci.Target?
 ---@return string? err
@@ -161,8 +204,12 @@ function M.parse(arg)
     if not host then
       return nil, ('not a forge URL: %s'):format(arg)
     end
-    if require('ci.forge').is_github(host) then
+    local forge = require('ci.forge')
+    if forge.is_github(host) then
       return parse_github(arg)
+    end
+    if forge.is_gitlab(host) then
+      return parse_gitlab(arg, host)
     end
     return parse_forgejo(arg, host)
   end
