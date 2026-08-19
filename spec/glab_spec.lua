@@ -76,6 +76,15 @@ describe('log.parse on a forge with no steps', function()
     )
   end)
 
+  it('draws the words a marker carries rather than a blank line', function()
+    local ansi = require('ci.ansi')
+    local text = '\27[0Ksection_start:1:coverage\r\27[0KRunning coverage report\n'
+    local rows = log.parse(text, {}, glab)
+    assert.same(1, #rows)
+    local drawn = ansi.line(rows[1].text, {})
+    assert.same('Running coverage report', drawn:sub(rows[1].conceal + 1))
+  end)
+
   it('opens no fold where a section closed before it said anything', function()
     local text = stamped('section_start:1:empty')
       .. '\n'

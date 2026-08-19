@@ -334,7 +334,10 @@ function M.parse(text, steps, be, carry)
     elseif kind == 'group' then
       nest = nest + 1
       if rest then
-        emit(raw, level(nest, true), 'CiGroup', nil, ts + #body - #rest)
+        -- Where the marker was erased rather than left behind, the rendered
+        -- line is the heading alone and there is nothing in front to hide.
+        local erased = raw:find('\r\27%[0?K') ~= nil
+        emit(raw, level(nest, true), 'CiGroup', nil, erased and 0 or (ts + #body - #rest))
       else
         heading = true
       end

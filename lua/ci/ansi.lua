@@ -203,6 +203,10 @@ function M.line(line, st)
   ---@type string, ci.ansi.Span[]
   local text, spans = '', {}
   for segment in (line .. '\r'):gmatch('([^\r]*)\r') do
+    -- An erase straight after the carriage return clears the line instead of
+    -- overwriting the front of it, which is how a runner hides a marker behind
+    -- the words it introduces.
+    local erase = segment:find('^\27%[0?K') ~= nil
     local seg = segment:gsub(CSI, function(m)
       if m:sub(-1) ~= 'm' then
         return ''
@@ -229,7 +233,7 @@ function M.line(line, st)
     if hl and len > from then
       sp[#sp + 1] = { from, len, hl }
     end
-    if len < #text then
+    if not erase and len < #text then
       for _, s in ipairs(spans) do
         if s[2] > len then
           sp[#sp + 1] = { math.max(s[1], len), s[2], s[3] }
