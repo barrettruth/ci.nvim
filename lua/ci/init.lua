@@ -8,6 +8,20 @@ local M = {}
 
 local GIT = 2000
 
+--- Whether resolving {t} asks the forge anything. The rest name their buffer
+--- outright, and a progress report for them would open and close in one tick.
+---@param t ci.Target
+---@return boolean
+local function waits(t)
+  if t.kind == 'run' then
+    return t.index ~= nil
+  end
+  if t.kind == 'pr' then
+    return t.repo == nil
+  end
+  return t.kind ~= 'job'
+end
+
 ---@return string? name
 local function branch()
   local r = vim.system({ 'git', 'rev-parse', '--abbrev-ref', 'HEAD' }, { text = true }):wait(GIT)
@@ -79,8 +93,22 @@ local function resolve(t, on_uri, on_err)
     return done(uri(t.repo, 'run', t.id, t.attempt))
   end
 
-  if t.kind == 'pr' and t.number then
-    return done(uri(t.repo, 'pr', t.number))
+  if t.kind == 'pr' then
+    if t.sigil and t.sigil ~= be.nouns.ref then
+      local its, given = be.nouns.ref .. t.number, t.sigil .. t.number
+      return on_err(('%s writes a %s %s, not %s'):format(host, be.nouns.pr, its, given))
+    end
+    if t.repo then
+      return done(uri(t.repo, 'pr', t.number))
+    end
+    -- A number on its own names no repository, and where the branch is a
+    -- fork's the one it means is the base, which only the forge can say.
+    return be.repo(function(slug, e)
+      if e then
+        return on_err(e)
+      end
+      done(uri(slug, 'pr', t.number))
+    end)
   end
 
   if t.kind == 'workflow' then
@@ -151,9 +179,9 @@ function M.run(arg, mods)
   if vim.fn.executable(cli) == 0 then
     return msg.err(('%s is not on $PATH'):format(cli))
   end
-  -- The resolving kinds ask GitHub which commit or run is meant, and there is
-  -- no buffer yet to mark busy while they do.
-  local report = t.kind ~= 'job' and msg.progress(('Resolving %s'):format(arg or 'HEAD'))
+  -- There is no buffer yet to mark busy while a target is resolved.
+  local shown = arg ~= '' and arg or 'HEAD'
+  local report = waits(t) and msg.progress(('Resolving %s'):format(shown))
   -- Resolving a target is a round trip, and the window it was asked from is
   -- the one it belongs in, not whichever happens to be current by the time
   -- the answer lands.

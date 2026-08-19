@@ -3,14 +3,38 @@ local target = require('ci.target')
 local GH = 'https://github.com/o/r'
 
 describe('target.parse', function()
-  it('defaults to the active pull request', function()
-    assert.same({ kind = 'pr' }, target.parse(nil))
-    assert.same({ kind = 'pr' }, target.parse(''))
+  it('defaults to the branch', function()
+    assert.same({ kind = 'branch' }, target.parse(nil))
+    assert.same({ kind = 'branch' }, target.parse(''))
+    assert.same({ kind = 'branch' }, target.parse('  '))
   end)
 
   it('treats a bare argument as a revision, peeled to a commit', function()
     assert.same({ kind = 'rev', expr = 'master^{commit}' }, target.parse('master'))
     assert.same({ kind = 'rev', expr = 'v0.1.0^{commit}' }, target.parse('v0.1.0'))
+  end)
+
+  it('reads a bare number as a pull request', function()
+    assert.same({ kind = 'pr', number = 7 }, target.parse('7'))
+    assert.same({ kind = 'pr', number = 1234 }, target.parse('1234'))
+  end)
+
+  it('carries the sigil a number was written with', function()
+    assert.same({ kind = 'pr', number = 7, sigil = '#' }, target.parse('#7'))
+    assert.same({ kind = 'pr', number = 7, sigil = '!' }, target.parse('!7'))
+  end)
+
+  it('leaves a revision that only looks like a number', function()
+    assert.same({ kind = 'rev', expr = '1234^{commit}^{commit}' }, target.parse('1234^{commit}'))
+    assert.same({ kind = 'rev', expr = 'refs/heads/123^{commit}' }, target.parse('refs/heads/123'))
+    assert.same({ kind = 'rev', expr = '12ab^{commit}' }, target.parse('12ab'))
+    assert.same({ kind = 'rev', expr = '1.2.3^{commit}' }, target.parse('1.2.3'))
+  end)
+
+  it('takes a number no forge would mint as one', function()
+    assert.same({ kind = 'rev', expr = '#7x^{commit}' }, target.parse('#7x'))
+    assert.same({ kind = 'rev', expr = '#^{commit}' }, target.parse('#'))
+    assert.same({ kind = 'rev', expr = '-7^{commit}' }, target.parse('-7'))
   end)
 
   it('reads a job URL', function()

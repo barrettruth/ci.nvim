@@ -6,7 +6,7 @@ local LIST = 30000
 local LOG = 30000
 
 ---@type ci.Nouns
-M.nouns = { run = 'pipeline', group = 'stage' }
+M.nouns = { run = 'pipeline', group = 'stage', pr = 'merge request', ref = '!' }
 
 --- Retrying reaches the failed and canceled jobs and no others, and a cancel
 --- already under way cannot be hurried, so neither of the other two would do
@@ -213,6 +213,11 @@ local function resolve(repo, on_done)
     end
     on_done(data.path_with_namespace)
   end)
+end
+
+---@param on_done fun(repo?: string, err?: string)
+function M.repo(on_done)
+  return resolve(nil, on_done)
 end
 
 --- gitlab resolves a branch, a tag or a sha, and no other revision, so HEAD is

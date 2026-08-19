@@ -1,6 +1,6 @@
 local M = {}
 
----@alias ci.Target.Kind 'job'|'run'|'rev'|'pr'|'workflow'|'repo'
+---@alias ci.Target.Kind 'job'|'run'|'rev'|'pr'|'branch'|'workflow'|'repo'
 
 ---@class ci.Target
 ---@field kind ci.Target.Kind
@@ -12,6 +12,8 @@ local M = {}
 ---@field number? integer
 ---@field expr? string
 ---@field file? string
+---@field sigil? string the one the argument was written with, for resolve() to
+---       hold against the forge's own
 
 ---@param s string
 ---@return string? path
@@ -197,7 +199,7 @@ end
 function M.parse(arg)
   arg = arg and vim.trim(arg) or ''
   if arg == '' then
-    return { kind = 'pr' }
+    return { kind = 'branch' }
   end
   if arg:match('^https?://') then
     local host = arg:match('^https?://([^/]+)/')
@@ -212,6 +214,19 @@ function M.parse(arg)
       return parse_gitlab(arg, host)
     end
     return parse_forgejo(arg, host)
+  end
+  -- Which sigil a forge writes is its own business, so the one given is
+  -- carried rather than judged here, where no forge is known yet.
+  local sigil, sigilled = arg:match('^([#!])(%d+)$')
+  if sigilled then
+    return { kind = 'pr', number = tonumber(sigilled), sigil = sigil }
+  end
+  -- Git wants four hex digits before it will read one as an abbreviated
+  -- object, so a shorter number is never a revision, and a longer one is a
+  -- pull request far more often than it is a commit that spells itself in
+  -- decimal. `{n}^{commit}` still asks for the commit.
+  if arg:match('^%d+$') then
+    return { kind = 'pr', number = tonumber(arg) }
   end
   return { kind = 'rev', expr = arg .. '^{commit}' }
 end

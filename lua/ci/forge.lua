@@ -1,13 +1,16 @@
 local M = {}
 
---- What a forge calls the two things ci.nvim has no neutral word for. Prose
---- only: the `ci://` kind stays `run` whatever the forge calls it.
+--- What a forge calls the things ci.nvim has no neutral word for. Prose only:
+--- the `ci://` kind stays `run` whatever the forge calls it.
 ---@class ci.Nouns
 ---@field run string a collection of jobs
 ---@field group string what a job belongs to, shown beside its name
+---@field pr string what it calls a change proposed against a branch
+---@field ref string the sigil it writes before that change's number
 
 ---@class ci.Backend
 ---@field nouns ci.Nouns
+---@field repo fun(on_done: fun(repo?: string, err?: string))
 ---@field rollup fun(expr: string, repo?: string, on_done: fun(res?: ci.gh.Rollup, err?: string))
 ---@field pr_for_branch fun(branch: string, repo?: string, on_done: fun(pr?: ci.gh.BranchPr, err?: string))
 ---@field pr_by_number fun(number: integer, repo?: string, on_done: fun(pr?: ci.gh.Pr, err?: string))

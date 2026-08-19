@@ -5,7 +5,7 @@ local LOG = 30000
 local VERSION = 2000
 
 ---@type ci.Nouns
-M.nouns = { run = 'run', group = 'workflow' }
+M.nouns = { run = 'run', group = 'workflow', pr = 'pull request', ref = '#' }
 
 --- gh 2.97 stopped printing a response that carries terminal escape sequences
 --- unless asked to, and a job's log is nothing but. Older gh has no such flag
@@ -282,6 +282,27 @@ end
 ---@field headline string
 ---@field state? ci.gql.Conclusion
 ---@field checks ci.Check[]
+
+local REPO_NAME = [[
+query($owner:String!,$repo:String!){
+  repository(owner:$owner,name:$repo){ nameWithOwner }
+}]]
+
+--- The concrete "owner/name" behind gh's placeholders. A `ci://` name has to
+--- spell it out, and the placeholders resolve without ever saying to what.
+---@param on_done fun(repo?: string, err?: string)
+function M.repo(on_done)
+  return graphql(REPO_NAME, {}, nil, function(data, err)
+    if err then
+      return on_done(nil, err)
+    end
+    local full = vim.tbl_get(data or {}, 'repository', 'nameWithOwner')
+    if not full then
+      return on_done(nil, 'cannot resolve the repository from the remote')
+    end
+    on_done(full)
+  end)
+end
 
 --- Resolves a git revision and its checks in one request. {expr} is evaluated
 --- by GitHub, so it sees the remote's refs rather than whatever was last

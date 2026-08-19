@@ -10,7 +10,7 @@ local LOG = 30000
 
 --- Forgejo Actions is modelled on GitHub's, down to the words.
 ---@type ci.Nouns
-M.nouns = { run = 'run', group = 'workflow' }
+M.nouns = { run = 'run', group = 'workflow', pr = 'pull request', ref = '#' }
 
 --- Forgejo ignores `limit` unless `page` is given with it, and answers with
 --- every row when it is not. Always ask for both.
@@ -143,6 +143,11 @@ local function resolve_repo(repo, on_done)
     end
     on_done(full)
   end)
+end
+
+---@param on_done fun(repo?: string, err?: string)
+function M.repo(on_done)
+  return resolve_repo(nil, on_done)
 end
 
 --- Forgejo has no server-side revision parsing, so a revision is only as

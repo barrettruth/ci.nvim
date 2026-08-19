@@ -39,12 +39,21 @@ COMMAND                                                          *ci-commands*
                         branch. Falls back to the branch head if no pull
                         request is open.
 
+:CI {n}                 Show checks for a pull request by number. A bare
+                        `:CI 123` works on every forge. A sigil, if written,
+                        must be the one its forge writes: `#` on GitHub and
+                        Forgejo, `!` on GitLab. The other is rejected.
+
 :CI {rev}               Show checks for a git revision. {rev} is resolved by
                         GitHub, not locally, so `:CI master` is the real tip
                         of master rather than a (possibly) stale local ref.
                         Accepts anything git-rev-parse accepts: branches,
                         tags, SHAs, `master~3`. Non-commits and ranges are
                         rejected.
+
+                        WARNING: an all-digit {rev} is read as a pull request
+                        number. Write `:CI 123^{commit}` or
+                        `:CI refs/heads/123` for the revision.
 
                         Note that `:CI HEAD` is therefore the remote default
                         branch. Use |:CI| with no args for your working

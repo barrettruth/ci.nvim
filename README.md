@@ -45,6 +45,7 @@ luarocks install ci.nvim
 ```vim
 " checks for the active pull request on this branch
 :CI
+:CI 123
 
 " any git revision, resolved by GitHub rather than locally
 :CI master
@@ -75,6 +76,7 @@ starts a manual job, walk job steps with `[[` and `]]`, and more.
 
 ## Known limitations
 
+- **Numbers (all forges)**: a bare `:CI 123` is a pull request, so a revision that is all digits needs `:CI 123^{commit}` or `:CI refs/heads/123`.
 - **In-progress jobs (GitHub)**: gh [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their step status only, until completion.
 - **In-progress jobs (GitLab)**: GitLab pushes a running job's trace in bursts tens of seconds apart, so the log follows at that pace however often it is polled.
 - **Steps (GitLab)**: jobs have no steps, so a log's own sections fold in their place and `[[`/`]]` move between sections. Nothing folds beneath them.
