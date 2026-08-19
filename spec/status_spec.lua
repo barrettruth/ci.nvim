@@ -58,3 +58,12 @@ describe('status.bucket', function()
     end
   end)
 end)
+
+describe('status.manual', function()
+  it('tells a job waiting on a person from one waiting on a runner', function()
+    assert.is_true(status.manual('manual'))
+    assert.is_false(status.manual('created'))
+    assert.is_false(status.manual('pending'))
+    assert.is_false(status.manual(nil))
+  end)
+end)

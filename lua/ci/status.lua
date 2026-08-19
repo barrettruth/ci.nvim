@@ -141,6 +141,15 @@ function M.bucket(status, conclusion)
   return 'pending'
 end
 
+--- Whether {status} waits on a person rather than on a runner. It buckets as
+--- pending like a queued job, but nothing will move it, so a poll waiting for
+--- it to move waits for ever.
+---@param status? string
+---@return boolean
+function M.manual(status)
+  return (status or ''):lower() == 'manual'
+end
+
 --- Everything needed to draw one check: its glyph, its highlight, and the
 --- bucket both came from, which callers sort on.
 ---@param status? string

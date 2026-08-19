@@ -94,8 +94,13 @@ describe('a gitlab job with no log', function()
     assert.is_falsy(vim.b[b].ci.pending)
   end)
 
-  it('keeps watching one that has still to run', function()
+  it('stops watching one that waits on a person', function()
     stub({ job = { id = 7, name = 'deploy', status = 'manual' }, log = '' })
+    assert.is_falsy(vim.b[open(URI)].ci.pending)
+  end)
+
+  it('keeps watching one a runner will pick up on its own', function()
+    stub({ job = { id = 7, name = 'build', status = 'created' }, log = '' })
     assert.is_true(vim.b[open(URI)].ci.pending)
   end)
 

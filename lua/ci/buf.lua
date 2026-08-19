@@ -79,7 +79,7 @@ local function unsettled(buf, b)
   local status = require('ci.status')
   for _, c in pairs(b.checks or {}) do
     local bucket = status.bucket(c.status, c.conclusion)
-    if bucket == 'running' or bucket == 'pending' then
+    if (bucket == 'running' or bucket == 'pending') and not status.manual(c.status) then
       return true
     end
   end

@@ -692,7 +692,7 @@ local function steplist(buf, job)
   -- here to tell the poll this buffer has not finished. One that has settled
   -- without a log will never have one.
   local bucket = status.bucket(job.status, job.conclusion)
-  local waiting = bucket == 'running' or bucket == 'pending'
+  local waiting = (bucket == 'running' or bucket == 'pending') and not status.manual(job.status)
   vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = waiting, loaded = true })
   if waiting then
     buf_util.watch(buf)
