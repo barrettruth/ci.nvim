@@ -309,7 +309,7 @@ function M.parse(text, steps, be, carry)
       end
     end
 
-    local kind, rest = marks(body)
+    local kind, rest, closed = marks(body)
 
     if kind ~= 'endgroup' then
       flush()
@@ -330,9 +330,9 @@ function M.parse(text, steps, be, carry)
 
     if kind == 'endgroup' then
       heading = false
-      nest = math.max(0, nest - 1)
+      nest = math.max(0, nest - (closed or 1))
     elseif kind == 'group' then
-      nest = nest + 1
+      nest = math.max(0, nest - (closed or 0)) + 1
       if rest then
         -- Where the marker was erased rather than left behind, the rendered
         -- line is the heading alone and there is nothing in front to hide.

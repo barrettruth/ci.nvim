@@ -34,19 +34,33 @@ end
 --- words heads the fold with those, and a bare one heads it with nothing and
 --- leaves the line below to do it. gitlab writes no severity markers at all,
 --- so a failure is red prose and nothing more.
+---
+--- A marker ends at a carriage return rather than a newline, so a runner that
+--- does not stamp its lines packs an end, the next start and its heading onto
+--- one of them.
 ---@param body string
 ---@return ci.log.Kind? kind
 ---@return string? rest
+---@return integer? closed sections the line ended before the kind it reports
 function M.marks(body)
-  local line = (body:gsub('^\27%[0K', ''))
-  local verb = line:match('^section_(%a+):%d+:[%w_%.%-]+')
-  if verb == 'end' then
-    return 'endgroup'
+  local closed, opened = 0, false
+  ---@type string?
+  local rest
+  for i, piece in ipairs(vim.split(body, '\r\27[0K', { plain = true })) do
+    local text = (piece:gsub('^\27%[0K', ''))
+    local verb = text:match('^section_(%a+):%d+:[%w_%.%-]+')
+    if verb == 'end' then
+      closed = closed + 1
+    elseif verb == 'start' then
+      opened = true
+    elseif i > 1 and text ~= '' then
+      rest = text
+    end
   end
-  if verb ~= 'start' then
-    return nil
+  if opened then
+    return 'group', rest, closed
   end
-  return 'group', line:match('\r\27%[0K(.+)$')
+  return closed > 0 and 'endgroup' or nil, nil, closed
 end
 
 --- The last line of {s} that has anything on it.

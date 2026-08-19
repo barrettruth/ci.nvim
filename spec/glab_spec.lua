@@ -39,6 +39,14 @@ describe('glab.marks', function()
     assert.same('endgroup', glab.marks('section_end:1787024413:step_script'))
   end)
 
+  it('reads a line that ends one section and opens the next', function()
+    local kind, rest, closed =
+      glab.marks('section_end:1:a\r\27[0Ksection_start:2:b\r\27[0K\27[0KPreparing environment')
+    assert.same('group', kind)
+    assert.same('Preparing environment', rest)
+    assert.same(1, closed)
+  end)
+
   it('ignores a line that merely mentions one', function()
     assert.is_nil(glab.marks('echo section_start:1:nope'))
   end)
@@ -74,6 +82,22 @@ describe('log.parse on a forge with no steps', function()
       'Cleaning up project directory and file based variables',
       rows[1].text:sub(rows[1].conceal + 1)
     )
+  end)
+
+  it('keeps its nesting where a runner packs the markers onto one line', function()
+    local text = table.concat({
+      'section_start:1:a\r\27[0KFirst',
+      'in a',
+      'section_end:2:a\r\27[0Ksection_start:3:b\r\27[0KSecond',
+      'in b',
+      'section_end:4:b\r\27[0K',
+      'after',
+    }, '\n')
+    local folds = {}
+    for _, r in ipairs(log.parse(text, {}, glab)) do
+      folds[#folds + 1] = r.fold
+    end
+    assert.same({ '>1', '1', '>1', '1', '0' }, folds)
   end)
 
   it('draws the words a marker carries rather than a blank line', function()
