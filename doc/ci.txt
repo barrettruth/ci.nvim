@@ -100,11 +100,13 @@ Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
 <
 {project} is `{owner}/{repo}`, or a GitLab path of any depth.
 
-A buffer with anything still running reloads itself every ten seconds and
-stops once the checks settle, or once no window is showing it. `:e` and `R`
-refresh on demand; either way the cursor and scroll position are kept.
-Re-running |:CI| for a buffer that is already open just moves to its window
-without refetching.
+A buffer with anything still running refreshes itself and stops once the
+checks settle, or once no window is showing it. `:e` and `R` refresh on
+demand; either way the cursor and scroll position are kept. Re-running |:CI|
+for a buffer that is already open just moves to its window without refetching.
+
+A running GitLab job's log is added to as it grows, in bursts tens of seconds
+apart.
 
 A job buffer folds two levels by default: step, then `##[group]`. Forgejo does
 not expose step boundaries, so its logs fold on `##[group]` alone. GitLab has

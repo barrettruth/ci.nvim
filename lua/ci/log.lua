@@ -42,15 +42,35 @@ local time_ns = api.nvim_create_namespace('ci.time')
 local BAND = { CiFail = 'CiFailBand', CiAttention = 'CiAttentionBand' }
 
 ---@param buf integer
+---@param i integer one-based line
+local function mark_time(buf, i)
+  local at = (stamps[buf] or {})[i]
+  if at then
+    api.nvim_buf_set_extmark(buf, time_ns, i - 1, 0, {
+      virt_text = { { at .. ' ', 'CiMuted' } },
+      virt_text_pos = 'inline',
+    })
+  end
+end
+
+--- Draws the timestamp column over lines {from}+1 upward, which is all of them
+--- unless a log has just grown and only the new ones want marking.
+---@param buf integer
+---@param from integer
+---@param to integer
+local function stamps_over(buf, from, to)
+  for i = from + 1, to do
+    mark_time(buf, i)
+  end
+end
+
+---@param buf integer
 ---@param on boolean
 local function times(buf, on)
   api.nvim_buf_clear_namespace(buf, time_ns, 0, -1)
   if on then
-    for i, at in pairs(stamps[buf] or {}) do
-      api.nvim_buf_set_extmark(buf, time_ns, i - 1, 0, {
-        virt_text = { { at .. ' ', 'CiMuted' } },
-        virt_text_pos = 'inline',
-      })
+    for i in pairs(stamps[buf] or {}) do
+      mark_time(buf, i)
     end
   end
   vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { times = on })
@@ -187,19 +207,33 @@ local function marked(body)
   return nil
 end
 
+--- What the parse loop carries from one line to the next, so a log served in
+--- pieces can be resumed where the last piece stopped.
+---@class ci.log.Carry
+---@field nest integer how many groups deep the text so far left the log
+---@field heading boolean a bare group marker is still waiting for its header
+---@field annot? ci.Hl the severity an unstamped run of lines is still under
+---@field seen integer rows emitted by earlier calls
+
 --- Splits a job log into rows. Lines are kept whole, with an offset marking
 --- the stamp and the marker to conceal; steps come from the API rather than
 --- the text, since a `run:` step logs its command, not its name.
+---
+--- {carry} resumes an earlier call. Steps are not carried: a forge that has
+--- them serves no partial log, so the two never meet.
 ---@param text string
 ---@param steps ci.log.Step[]
 ---@param be? ci.Backend the forge whose log this is
+---@param carry? ci.log.Carry
 ---@return ci.log.Row[]
-function M.parse(text, steps, be)
+---@return ci.log.Carry
+function M.parse(text, steps, be, carry)
   local prefix = be and be.prefix or stamped
   local marks = be and be.marks or marked
   -- A step holds the first fold level on a forge that has steps; where one has
   -- none its groups take that level instead, and `]]` reaches them.
   local base = #steps > 0 and 1 or 0
+  local seen = carry and carry.seen or 0
 
   --- The level {d} groups deep, opening a fold when {open}. Two is as deep as
   --- one goes, so a group nested below that joins the one above it.
@@ -211,10 +245,10 @@ function M.parse(text, steps, be)
   end
   ---@type ci.log.Row[]
   local rows = {}
-  local step_i, nest = 0, 0
+  local step_i, nest = 0, carry and carry.nest or 0
   --- Set by a group marker that carried no words of its own: the next line to
   --- be drawn is the heading, and heads the fold in the marker's place.
-  local heading = false
+  local heading = carry and carry.heading or false
   ---@type integer[]
   local pending = {}
 
@@ -251,10 +285,10 @@ function M.parse(text, steps, be)
   end
 
   ---@type ci.Hl?
-  local annot
+  local annot = carry and carry.annot or nil
   -- A log ends in a newline of its own, and a second would draw a line it does
   -- not have. One it genuinely ends on is still its own.
-  if text:sub(-1) ~= '\n' then
+  if text ~= '' and text:sub(-1) ~= '\n' then
     text = text .. '\n'
   end
   for line in text:gmatch('([^\n]*)\n') do
@@ -323,14 +357,14 @@ function M.parse(text, steps, be)
     elseif heading then
       heading = false
       emit(raw, level(nest, true), 'CiGroup', nil, ts)
-    elseif body ~= '' or #rows > 0 then
+    elseif body ~= '' or #rows + seen > 0 then
       emit(raw, here, nil, nil, ts)
     end
     ::continue::
   end
 
   flush()
-  return rows
+  return rows, { nest = nest, heading = heading, annot = annot, seen = seen + #rows }
 end
 
 ---@param rows ci.log.Row[]
@@ -377,14 +411,65 @@ end
 ---@field indent integer
 ---@field time? string
 
---- Renders {rows}, a chunk per tick, so a large log does not block.
+--- Lays the marks for one rendered line over {row}, which is zero-based.
+---@param buf integer
+---@param row integer
+---@param m ci.log.Paint
+---@param line string
+local function decorate(buf, row, m, line)
+  local prefix = math.min(m.conceal, #line)
+  if prefix > 0 then
+    api.nvim_buf_set_extmark(buf, ansi.ns, row, 0, { end_col = prefix, conceal = '' })
+  end
+  -- github.com draws a word where the marker is; the marker itself is
+  -- concealed, so the word has to be virtual like the indent beside it.
+  -- A band belongs to the message that carries a severity, not to
+  -- everything wearing its colour. A step is named in the foreground, the
+  -- way a passing one already is.
+  local band = not m.step and BAND[m.hl] or nil
+  local pre = {}
+  if m.indent > 0 then
+    pre[#pre + 1] = { ('  '):rep(m.indent), band }
+  end
+  if m.label then
+    pre[#pre + 1] = { m.label, band and { band, m.hl, 'CiBold' } or m.hl }
+  end
+  if #pre > 0 and prefix < #line then
+    api.nvim_buf_set_extmark(buf, ansi.ns, row, prefix, {
+      virt_text = pre,
+      virt_text_pos = 'inline',
+    })
+  end
+  if band then
+    -- Under the log's own colours, and out to the edge as on the web.
+    api.nvim_buf_set_extmark(buf, ansi.ns, row, 0, {
+      end_row = row + 1,
+      hl_group = band,
+      hl_eol = true,
+      priority = 90,
+    })
+  elseif m.hl then
+    api.nvim_buf_set_extmark(buf, ansi.ns, row, prefix, { end_row = row + 1, hl_group = m.hl })
+  end
+  ansi.apply(buf, row, m.spans, m.links, #line)
+  for _, u in ipairs(m.urls) do
+    api.nvim_buf_set_extmark(buf, ansi.ns, row, u[1], {
+      end_col = u[2],
+      hl_group = 'CiUrl',
+      url = u[3],
+    })
+  end
+end
+
+--- Renders {rows} to lines and their marks, a chunk per tick, so a large log
+--- does not block. {st} spans lines, and the reads that brought them.
 ---@param buf integer
 ---@param gen integer
 ---@param rows ci.log.Row[]
----@param done fun(following: table<integer, boolean>)
-local function paint(buf, gen, rows, done)
-  ---@type integer, ci.ansi.State
-  local i, st = 1, {}
+---@param st ci.ansi.State
+---@param write fun(lines: string[], meta: ci.log.Paint[])
+local function render(buf, gen, rows, st, write)
+  local i = 1
   ---@type string[], ci.log.Paint[]
   local lines, meta = {}, {}
   local function step()
@@ -413,19 +498,37 @@ local function paint(buf, gen, rows, done)
       buf_util.tick(buf, math.floor((i - 1) / #rows * 100))
       return vim.schedule(step)
     end
+    write(lines, meta)
+  end
+  step()
+end
+
+---@param buf integer
+---@return table<integer, boolean>
+local function at_end(buf)
+  local last = api.nvim_buf_line_count(buf)
+  ---@type table<integer, boolean>
+  local following = {}
+  for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+    following[win] = api.nvim_win_get_cursor(win)[1] >= last
+  end
+  return following
+end
+
+--- Draws the whole log over whatever the buffer held, leaving {st} where the
+--- last line ended it.
+---@param buf integer
+---@param gen integer
+---@param rows ci.log.Row[]
+---@param st ci.ansi.State
+---@param done fun(following: table<integer, boolean>)
+local function paint(buf, gen, rows, st, done)
+  render(buf, gen, rows, st, function(lines, meta)
     -- How much of what is on screen the new render agrees with. A log only
     -- grows, so this is usually all of it, and the rest is an append.
     local existing = api.nvim_buf_get_lines(buf, 0, -1, false)
+    local following = at_end(buf)
 
-    ---@type table<integer, boolean>
-    local following = {}
-    for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-      following[win] = api.nvim_win_get_cursor(win)[1] >= #existing
-    end
-
-    -- The last line of a log still being written arrives incomplete and is
-    -- finished by the next read, so agreement usually stops one line short of
-    -- the end. Rewriting from there is still only the tail.
     local keep = 0
     while keep < #existing and keep < #lines and existing[keep + 1] == lines[keep + 1] do
       keep = keep + 1
@@ -436,70 +539,105 @@ local function paint(buf, gen, rows, done)
 
     buf_util.set(buf, lines, keep)
     for k = keep + 1, #meta do
-      local m = meta[k]
-      local prefix = math.min(m.conceal, #lines[k])
-      if prefix > 0 then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, { end_col = prefix, conceal = '' })
-      end
-      -- github.com draws a word where the marker is; the marker itself is
-      -- concealed, so the word has to be virtual like the indent beside it.
-      -- A band belongs to the message that carries a severity, not to
-      -- everything wearing its colour. A step is named in the foreground, the
-      -- way a passing one already is.
-      local band = not m.step and BAND[m.hl] or nil
-      local pre = {}
-      if m.indent > 0 then
-        pre[#pre + 1] = { ('  '):rep(m.indent), band }
-      end
-      if m.label then
-        pre[#pre + 1] = { m.label, band and { band, m.hl, 'CiBold' } or m.hl }
-      end
-      if #pre > 0 and prefix < #lines[k] then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, {
-          virt_text = pre,
-          virt_text_pos = 'inline',
-        })
-      end
-      if band then
-        -- Under the log's own colours, and out to the edge as on the web.
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, 0, {
-          end_row = k,
-          hl_group = band,
-          hl_eol = true,
-          priority = 90,
-        })
-      elseif m.hl then
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, prefix, { end_row = k, hl_group = m.hl })
-      end
-      ansi.apply(buf, k - 1, m.spans, m.links, #lines[k])
-      for _, u in ipairs(m.urls) do
-        api.nvim_buf_set_extmark(buf, ansi.ns, k - 1, u[1], {
-          end_col = u[2],
-          hl_group = 'CiUrl',
-          url = u[3],
-        })
-      end
+      decorate(buf, k - 1, meta[k], lines[k])
     end
     done(following)
-  end
-  step()
+  end)
 end
 
---- Holds a growing log open and keeps anyone already at the end there. Folds
---- would hide the very lines being waited for, and a fixed line is the wrong
---- place to stand in a buffer that is still getting longer.
+--- Puts {rows} after everything the buffer holds. Nothing above is rewritten,
+--- so its marks, its folds and any cursor not following the end all stand.
+---@param buf integer
+---@param gen integer
+---@param rows ci.log.Row[]
+---@param st ci.ansi.State
+---@param done fun(following: table<integer, boolean>)
+local function extend(buf, gen, rows, st, done)
+  render(buf, gen, rows, st, function(lines, meta)
+    local following = at_end(buf)
+    if #lines == 0 then
+      return done(following)
+    end
+    local at = buf_util.append(buf, lines)
+    for k = 1, #meta do
+      decorate(buf, at + k - 1, meta[k], lines[k])
+    end
+    done(following)
+  end)
+end
+
+--- Holds a growing log open and keeps anyone already at the end there. A
+--- fixed line is the wrong place to stand in a buffer that is still getting
+--- longer. {open} lifts the folds that would hide the lines being waited for,
+--- and belongs to the first sight of a running log: doing it on every read
+--- would reopen every fold the reader has since closed.
 ---@param buf integer
 ---@param following table<integer, boolean>
-local function tail(buf, following)
+---@param open? boolean
+local function tail(buf, following, open)
   local last = api.nvim_buf_line_count(buf)
   for _, win in ipairs(vim.fn.win_findbuf(buf)) do
     api.nvim_win_call(win, function()
-      vim.wo[win][0].foldlevel = 99
+      if open then
+        vim.wo[win][0].foldlevel = 99
+      end
       if following[win] then
         api.nvim_win_set_cursor(win, { last, 0 })
       end
     end)
   end
+end
+
+--- What a buffer following a growing log has to remember between reads: how
+--- much of the trace it has drawn, and the state the parser and the ANSI
+--- machine were left in by the last line of it.
+---@class ci.log.Tail
+---@field id integer
+---@field repo? string
+---@field be ci.Backend
+---@field offset integer bytes of the trace already on screen
+---@field carry ci.log.Carry
+---@field st ci.ansi.State
+---@field idle integer reads in a row that brought nothing
+---@field due? integer uv time before which there is nothing worth asking for
+
+---@type table<integer, ci.log.Tail>
+local tails = {}
+
+--- gitlab pushes a running job's log in bursts tens of seconds apart, so
+--- reading every ten spends five requests to be told nothing. An empty read
+--- widens the gap and the first byte closes it.
+local TAIL_WAIT = 10000
+local TAIL_MAX = 30000
+
+--- Empty reads tolerated after the job stops. A trace that ends mid-line, or
+--- without the runner's closing words, is otherwise read for as long as it is
+--- open.
+local TAIL_GRACE = 2
+
+---@param idle integer
+---@return integer
+local function backoff(idle)
+  return math.min(TAIL_WAIT * (idle + 1), TAIL_MAX)
+end
+
+--- How much of {s} is whole lines. Scans back over the last line only, so it
+--- costs nothing on a trace that ends where it should.
+---@param s string
+---@return integer
+local function whole(s)
+  local cut = #s
+  while cut > 0 and s:byte(cut) ~= 10 do
+    cut = cut - 1
+  end
+  return cut
+end
+
+--- Whether {buf} is following a log its forge serves a piece at a time.
+---@param buf integer
+---@return boolean
+function M.tailing(buf)
+  return tails[buf] ~= nil
 end
 
 --- 404 is a log that was never written, 410 one that has aged out. Neither
@@ -530,20 +668,32 @@ local function steplist(buf, job)
     lines[i] = ('%s %s'):format(sym, s.name)
     marks[i] = hl
   end
+  local sym, hl = status.of(job.status, job.conclusion)
+  -- gitlab has no steps, and github serves none before a job starts, so the
+  -- job's own state is all there is to say.
+  if #lines == 0 then
+    lines[1] = ('%s job is %s'):format(sym, job.conclusion or job.status or 'unknown')
+    marks[1] = hl
+  end
   buf_util.set(buf, lines)
-  for i, hl in ipairs(marks) do
+  for i, mark in ipairs(marks) do
     api.nvim_buf_set_extmark(
       buf,
       ansi.ns,
       i - 1,
       0,
-      { end_col = #tostring(lines[i]), hl_group = hl }
+      { end_col = #tostring(lines[i]), hl_group = mark }
     )
   end
   -- A step is not a check, so it is not offered to <CR>; the flag is only
-  -- here to tell the poll this buffer has not finished.
-  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true, loaded = true })
-  buf_util.watch(buf)
+  -- here to tell the poll this buffer has not finished. One that has settled
+  -- without a log will never have one.
+  local bucket = status.bucket(job.status, job.conclusion)
+  local waiting = bucket == 'running' or bucket == 'pending'
+  vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = waiting, loaded = true })
+  if waiting then
+    buf_util.watch(buf)
+  end
 end
 
 ---@param buf integer
@@ -565,7 +715,26 @@ function M.render(buf, gen, u)
       return
     end
     local be = forge.of(u.host)
-    local rows = M.parse(text, usable_steps(job.steps), be)
+    local steps = usable_steps(job.steps)
+    -- A forge that serves a running job's log has to say when it stopped
+    -- growing; GitHub never gets here until the job is over.
+    local growing = be.finished ~= nil and not be.finished(text)
+    -- Whether the rest of this log can be read a piece at a time. A forge
+    -- with steps is left out: their positions come from the API rather than
+    -- the text, and a parse resumed midway cannot place them.
+    local piecemeal = growing and be.job_log_from ~= nil and #steps == 0
+    -- The last line of a growing trace breaks off mid-line. Drawing that half
+    -- would mean rewriting it once the rest arrived, which is the one thing an
+    -- append cannot do, so it waits for the read that completes it.
+    local drawn = piecemeal and text:sub(1, whole(text)) or text
+
+    -- gitlab answers for a job that has not run with an empty 200 rather than
+    -- an error, which leaves the same nothing a missing log does.
+    if drawn == '' then
+      return steplist(buf, job)
+    end
+
+    local rows, carry = M.parse(drawn, steps, be)
     levels[buf] = vim.tbl_map(function(r)
       return r.fold
     end, rows)
@@ -576,19 +745,30 @@ function M.render(buf, gen, u)
     for i, r in ipairs(rows) do
       stamps[buf][i] = r.time
     end
-    -- A forge that serves a running job's log has to say when it stopped
-    -- growing; GitHub never gets here until the job is over.
-    if be.finished and not be.finished(text) then
+    if growing then
       vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = true })
       buf_util.watch(buf)
     end
-    paint(buf, gen, rows, function(following)
+    ---@type ci.ansi.State
+    local st = {}
+    tails[buf] = piecemeal
+        and {
+          id = id,
+          repo = u.repo,
+          be = be,
+          offset = #drawn,
+          carry = carry,
+          st = st,
+          idle = 0,
+        }
+      or nil
+    paint(buf, gen, rows, st, function(following)
       vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { loaded = true })
       times(buf, showing or false)
       -- A log still being written is read at its end, so it is left open and
       -- the cursor rides the last line for anyone already sitting there.
       if vim.tbl_get(vim.b[buf], 'ci', 'pending') then
-        return tail(buf, following)
+        return tail(buf, following, not reload)
       end
       if reload then
         return buf_util.restore_view(buf)
@@ -614,7 +794,10 @@ function M.render(buf, gen, u)
       return
     end
     failed = true
-    if j.status ~= 'completed' then
+    -- `completed` is github's word for it and no gitlab or Forgejo job carries
+    -- it, so the bucket is asked rather than the spelling.
+    local bucket = status.bucket(j.status, j.conclusion)
+    if bucket == 'running' or bucket == 'pending' then
       return steplist(buf, j)
     end
     buf_util.fail(buf, no_log(err, j))
@@ -666,11 +849,101 @@ function M.render(buf, gen, u)
   end)
 end
 
+--- Reads what the log grew by and puts it on the end, never asking twice for
+--- bytes already drawn. A read that fails drops the tail state, leaving the
+--- next poll to reload in full and report through the path that says it once.
+---@param buf integer
+function M.tail(buf)
+  local t = tails[buf]
+  local from = t and t.be.job_log_from
+  if not t or not from then
+    return
+  end
+  if t.due and vim.uv.now() < t.due then
+    return
+  end
+  local gen = vim.tbl_get(vim.b[buf], 'ci', 'gen')
+  vim.bo[buf].busy = 1
+
+  ---@type ci.gh.Job?, string?, boolean
+  local job, chunk, failed = nil, nil, false
+
+  local function bail()
+    failed = true
+    tails[buf] = nil
+    if api.nvim_buf_is_valid(buf) then
+      vim.bo[buf].busy = 0
+    end
+  end
+
+  local function ready()
+    if failed or not job or not chunk or not buf_util.current(buf, gen) then
+      return
+    end
+    local sym, hl = status.of(job.status, job.conclusion)
+    vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { status = status.paint(hl, sym) })
+
+    -- Only whole lines are drawn, so a read that brought half of one brought
+    -- nothing, and the half is read again with the rest behind it.
+    local grown = chunk:sub(1, whole(chunk))
+    t.offset = t.offset + #grown
+    t.idle = grown == '' and t.idle + 1 or 0
+    t.due = vim.uv.now() + backoff(t.idle)
+
+    local bucket = status.bucket(job.status, job.conclusion)
+    local running = bucket == 'running' or bucket == 'pending'
+    -- Where a job stopped without writing its closing words, its own state is
+    -- the backstop.
+    local closed = t.be.finished ~= nil and t.be.finished(grown)
+    if closed or (not running and t.idle >= TAIL_GRACE) then
+      tails[buf] = nil
+      vim.b[buf].ci = vim.tbl_extend('force', vim.b[buf].ci, { pending = false })
+    end
+
+    if grown == '' then
+      vim.bo[buf].busy = 0
+      return
+    end
+    local rows, carry = M.parse(grown, {}, t.be, t.carry)
+    t.carry = carry
+    levels[buf], conceals[buf], stamps[buf] =
+      levels[buf] or {}, conceals[buf] or {}, stamps[buf] or {}
+    local at = #levels[buf]
+    for i, r in ipairs(rows) do
+      levels[buf][at + i] = r.fold
+      conceals[buf][at + i] = r.conceal
+      stamps[buf][at + i] = r.time
+    end
+    extend(buf, gen, rows, t.st, function(following)
+      if vim.tbl_get(vim.b[buf], 'ci', 'times') then
+        stamps_over(buf, at, at + #rows)
+      end
+      tail(buf, following)
+    end)
+  end
+
+  t.be.job(t.id, t.repo, function(data, err)
+    if err or not data then
+      return bail()
+    end
+    job = data
+    ready()
+  end)
+  from(t.id, t.offset, t.repo, function(out, err)
+    if err then
+      return bail()
+    end
+    chunk = out or ''
+    ready()
+  end)
+end
+
 ---@param buf integer
 function M.forget(buf)
   levels[buf] = nil
   conceals[buf] = nil
   stamps[buf] = nil
+  tails[buf] = nil
 end
 
 --- Shows or hides the timestamp column. Its own namespace, so flipping it

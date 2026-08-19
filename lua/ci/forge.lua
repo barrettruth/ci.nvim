@@ -13,6 +13,7 @@ local M = {}
 ---@field pr_by_number fun(number: integer, repo?: string, on_done: fun(pr?: ci.gh.Pr, err?: string))
 ---@field job fun(id: integer, repo?: string, on_done: fun(job?: ci.gh.Job, err?: string))
 ---@field job_log fun(id: integer, repo?: string, on_done: fun(text?: string, err?: string))
+---@field job_log_from? fun(id: integer, offset: integer, repo?: string, on_done: fun(text?: string, err?: string))
 ---@field run_jobs fun(id: integer, attempt?: integer, repo?: string, on_done: fun(jobs?: ci.gh.Job[], err?: string))
 ---@field latest_run? fun(file: string, repo?: string, on_done: fun(run?: ci.gh.WorkflowRun, err?: string))
 ---@field act? fun(id: integer, what: ci.gh.Act, repo?: string, on_done: fun(err?: string))

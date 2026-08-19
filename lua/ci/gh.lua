@@ -410,6 +410,7 @@ end
 ---@field steps? ci.gh.JobStep[]
 ---@field downstream? integer the run this one triggered, when it triggered one
 --- rather than running anything itself
+---@field bridge? boolean triggers rather than runs, so has no job of its own
 
 ---@param id integer
 ---@param repo? string

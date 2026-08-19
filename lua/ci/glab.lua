@@ -49,12 +49,29 @@ function M.marks(body)
   return 'group', line:match('\r\27%[0K(.+)$')
 end
 
+--- The last line of {s} that has anything on it.
+---@param s string
+---@return string
+local function closing(s)
+  local to = #s
+  while to > 0 and s:byte(to) == 10 do
+    to = to - 1
+  end
+  local from = to
+  while from > 0 and s:byte(from) ~= 10 do
+    from = from - 1
+  end
+  return s:sub(from + 1, to)
+end
+
 --- A runner closes every log with one of these, so their absence is the only
---- signal that a job is still writing.
+--- signal that a job is still writing. Only the closing line is read: a job
+--- that prints the words itself would end the read early.
 ---@param text string
 ---@return boolean
 function M.finished(text)
-  return text:match('Job succeeded') ~= nil or text:match('ERROR: Job failed') ~= nil
+  local last = closing(text)
+  return last:match('Job succeeded') ~= nil or last:match('ERROR: Job failed') ~= nil
 end
 
 ---@param s string
@@ -376,12 +393,20 @@ local function to_job(j)
   }
 end
 
+--- A commit's statuses carry a trigger job in the shape of a real one with
+--- nothing to tell them apart, so a checks list can offer an id this endpoint
+--- has never heard of.
 ---@param id integer
 ---@param repo? string
 ---@param on_done fun(job?: ci.gh.Job, err?: string)
 function M.job(id, repo, on_done)
   api(('projects/%s/jobs/%d'):format(project(repo), id), function(data, err)
     if err then
+      if err:match('404') or err:match('[Nn]ot [Ff]ound') then
+        err = ('no job %d: it may be a trigger, which starts a pipeline rather than running'):format(
+          id
+        )
+      end
       return on_done(nil, err)
     end
     on_done(to_job(data))
@@ -398,6 +423,22 @@ function M.job_log(id, repo, on_done)
       return on_done(nil, err)
     end
     on_done(out)
+  end, LOG)
+end
+
+--- The trace from {offset} bytes in. A request past the end answers with an
+--- empty 200 rather than an error, so a read that finds nothing costs no bytes.
+---@param id integer
+---@param offset integer
+---@param repo? string
+---@param on_done fun(text?: string, err?: string)
+function M.job_log_from(id, offset, repo, on_done)
+  local at = ('projects/%s/jobs/%d/trace?byte_offset=%d'):format(project(repo), id, offset)
+  return run({ 'api', at }, function(out, err)
+    if err then
+      return on_done(nil, err)
+    end
+    on_done(out or '')
   end, LOG)
 end
 
@@ -429,6 +470,9 @@ function M.run_jobs(id, _attempt, repo, on_done)
       end
       for _, b in ipairs(bridges or {}) do
         local j = to_job(b)
+        -- The jobs endpoint will not answer to a bridge's id, whether or not
+        -- it has yet started the pipeline it leads to.
+        j.bridge = true
         j.downstream = b.downstream_pipeline and b.downstream_pipeline.id or nil
         jobs[#jobs + 1] = j
       end

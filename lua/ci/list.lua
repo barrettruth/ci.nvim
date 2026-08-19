@@ -133,14 +133,15 @@ local function jobs_to_checks(jobs, u, page)
   local out = {}
   for i, j in ipairs(jobs) do
     -- A job that only triggered another run has no log of its own, so the row
-    -- leads to the run it triggered.
+    -- leads to the run it triggered. One that has not triggered yet leads
+    -- nowhere, and still has no id worth offering.
     local opens = j.downstream and ('ci://%s/%s/run/%d'):format(u.host, u.repo, j.downstream) or nil
     out[#out + 1] = {
       name = j.name,
       status = j.status,
       conclusion = j.conclusion,
       url = j.html_url or require('ci.tea').job_page(page, i - 1, j.attempt),
-      job_id = not opens and j.id or nil,
+      job_id = (not opens and not j.bridge) and j.id or nil,
       run_id = j.run_id,
       group = j.workflow_name,
       opens = opens,

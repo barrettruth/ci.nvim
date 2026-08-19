@@ -115,7 +115,12 @@ function M.watch(buf)
       else
         waits[buf] = nil
       end
-      if not M.reload(buf) then
+      -- A log served a piece at a time is added to the end; anything else is
+      -- drawn again from the top.
+      local log = require('ci.log')
+      if log.tailing(buf) then
+        log.tail(buf)
+      elseif not M.reload(buf) then
         M.unwatch(buf)
       end
     end)
@@ -234,6 +239,28 @@ function M.set(buf, lines, from)
   kept[buf] = nil
   reported[buf] = nil
   settle(buf, 'success')
+end
+
+--- Adds {lines} after everything {buf} holds, answering the zero-based row the
+--- first landed on. Nothing above is rewritten, so its marks and folds stand.
+---@param buf integer
+---@param lines string[]
+---@return integer at
+function M.append(buf, lines)
+  local at = api.nvim_buf_line_count(buf)
+  -- A buffer nothing has been written to still holds one empty line, and
+  -- appending after it would open the log on a blank it does not have.
+  if at == 1 and api.nvim_buf_get_lines(buf, 0, 1, false)[1] == '' then
+    at = 0
+  end
+  vim.bo[buf].modifiable = true
+  api.nvim_buf_set_lines(buf, at, -1, false, lines)
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].busy = 0
+  kept[buf] = nil
+  reported[buf] = nil
+  settle(buf, 'success')
+  return at
 end
 
 ---@param buf integer
