@@ -608,7 +608,7 @@ local tails = {}
 --- reading every ten spends five requests to be told nothing. An empty read
 --- widens the gap and the first byte closes it.
 local TAIL_WAIT = 10000
-local TAIL_MAX = 30000
+local TAIL_MAX = 15000
 
 --- Empty reads tolerated after the job stops. A trace that ends mid-line, or
 --- without the runner's closing words, is otherwise read for as long as it is
