@@ -20,10 +20,6 @@ real ANSI colours, step-level folds, and more.
 - (Optionally) [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com
 - (Optionally) [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+
 
-The forge is chosen from `upstream`, else `origin`, matching how `tea` picks
-the repository to query. Only gitlab.com is recognised as GitLab; any other
-host is read as Forgejo.
-
 ## Installation
 
 With `vim.pack` (Neovim 0.12+):

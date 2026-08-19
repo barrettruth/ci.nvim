@@ -6,7 +6,7 @@ Author:  Barrett Ruth <br@barrettruth.com> License: GPL-3.0
 INTRODUCTION                                                    *ci* *ci.nvim*
 
 GitHub Actions, GitLab CI/CD and Forgejo Actions status and logs for whatever
-you are working on. One command, |:CI|, and no configuration.
+you are working on. One command, |:CI|, no configuration.
 
 ==============================================================================
 REQUIREMENTS                                                 *ci-requirements*
@@ -16,10 +16,6 @@ REQUIREMENTS                                                 *ci-requirements*
 - `gh`, authenticated (`gh auth login`), for github.com
 - `glab`, authenticated (`glab auth login`), for gitlab.com
 - `tea`, authenticated (`tea login add`), for Forgejo 16+
-
-The forge is chosen from the host of the `upstream` remote, else `origin`:
-github.com uses `gh`, gitlab.com uses `glab`, anything else uses `tea`. A
-GitLab served from any other host is read as Forgejo.
 
 ==============================================================================
 INSTALL                                                           *ci-install*
@@ -40,24 +36,19 @@ COMMAND                                                          *ci-commands*
                         request is open.
 
 :CI {n}                 Show checks for a pull request by number. A bare
-                        `:CI 123` works on every forge. A sigil, if written,
-                        must be the one its forge writes: `#` on GitHub and
-                        Forgejo, `!` on GitLab. The other is rejected.
+                        `:CI 123` works on every forge. Optionally, prefix
+                        with `#` on GitHub and Forgejo, `!` on GitLab.
 
-:CI {rev}               Show checks for a git revision. {rev} is resolved by
-                        GitHub, not locally, so `:CI master` is the real tip
-                        of master rather than a (possibly) stale local ref.
-                        Accepts anything git-rev-parse accepts: branches,
-                        tags, SHAs, `master~3`. Non-commits and ranges are
-                        rejected.
+:CI {rev}               Show checks for a git revision, or the working state
+                        if unspecified. {rev} is resolved by GitHub, not
+                        locally (`:CI master` is the real tip of master rather
+                        than a possibly stale local ref). Accepts anything
+                        git-rev-parse accepts: branches, tags, SHAs,
+                        `master~3`, etc. Non-commits and ranges are rejected.
 
                         WARNING: an all-digit {rev} is read as a pull request
                         number. Write `:CI 123^{commit}` or
                         `:CI refs/heads/123` for the revision.
-
-                        Note that `:CI HEAD` is therefore the remote default
-                        branch. Use |:CI| with no args for your working
-                        state.
 
 :CI {url}               Show a forge URL. Recognised on github.com:
                           .../actions/runs/{run}/job/{job}    a job log
@@ -95,13 +86,12 @@ Repository resolution is delegated entirely to the CLI. For `gh` that means
 fork pull requests resolve to the base repository (where checks usually live);
 if it picks the wrong one, fix it with `gh repo set-default`. `tea` has no
 equivalent, so on Forgejo a fork is queried as itself. On GitLab a merge
-request opened from a fork is followed to the fork, where its pipeline runs.
+request opened from a fork is followed to the fork (where its pipeline runs).
 
 ==============================================================================
 BUFFERS                                                           *ci-buffers*
 
-Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
->
+`:edit` reloads CI buffers and `:CI` on the name reopens them: >
     ci://{host}/{project}/job/{job_id}
     ci://{host}/{project}/run/{run_id}[/{attempt}]
     ci://{host}/{project}/pr/{number}
@@ -111,8 +101,8 @@ Buffers are named, so `:edit` reloads them and `:CI` on the name reopens them:
 
 A buffer with anything still running refreshes itself and stops once the
 checks settle, or once no window is showing it. `:e` and `R` refresh on
-demand; either way the cursor and scroll position are kept. Re-running |:CI|
-for a buffer that is already open just moves to its window without refetching.
+demand; the cursor and scroll position are kept. Re-running |:CI| for an open
+buffer does nothing.
 
 A running GitLab job's log is added to as it grows, in bursts tens of seconds
 apart.
@@ -222,7 +212,7 @@ Until then a running job shows its steps. Once finished the job automatically
 refreshes to display the newly available logs.
 
 Forgejo's Actions API is younger than GitHub's, so it has quite a few
-behaviors missing
+behaviors missing:
 
 Firstly, Forgejo will not say where one step of a job ends and the next
 begins. Resultedly, a job log folds on `##[group]` alone. Step folds and step
@@ -235,22 +225,12 @@ Forgejo 16.0+ also lacks fetching individual jobs and does not resolve
 revisions remotely. Therefore, `:CI {rev}` only sees what you've fetched.
 Individual jobs cannot be fetched either, meaning job URLs opened directly do
 not show name nor status. Lastly, this also means that older job attemps
-(100+) cannot be fetched
+(100+) cannot be fetched.
 
 GitLab jobs have no steps. A log's own sections fold in their place, so `[[`
 and `]]` move between sections, and nothing folds beneath them.
 
-A GitLab checks list names no stage. A commit's statuses do not carry one,
-where a pipeline's own job list does.
-
-A GitLab pipeline lists the child pipelines it triggers alongside its own
-jobs. They have no log of their own, so `<CR>` opens the pipeline each one
-triggered.
-
-Retrying a GitLab pipeline reaches its failed and canceled jobs and no others.
-Where none of them failed, `cr` says so rather than asking. A cancel already
-under way cannot be hurried either, so a second `cc` says that rather than
-offering a force GitLab does not have.
+Retrying a GitLab pipeline reaches its failed and canceled jobs - no others.
 
 GitLab does not resolve revisions remotely either, so `:CI {rev}` takes a
 branch, a tag or a SHA, and `:CI HEAD` is answered locally.
