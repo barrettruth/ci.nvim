@@ -43,6 +43,11 @@ end
 ---@return string? rest
 ---@return integer? closed sections the line ended before the kind it reports
 function M.marks(body)
+  -- Splitting a line costs a table and a string for each piece, and almost no
+  -- line in a log carries a marker at all.
+  if not body:find('section_', 1, true) then
+    return nil
+  end
   local closed, opened = 0, false
   ---@type string?
   local rest
