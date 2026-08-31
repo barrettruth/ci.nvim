@@ -55,12 +55,6 @@ body:
 
   - type: textarea
     attributes:
-      label: ci config
-      description: 'Relevant `vim.g.ci` config'
-      render: lua
-
-  - type: textarea
-    attributes:
       label: Minimal reproduction
       description: |
         Save the script below as `repro.lua`, edit it to match your setup, and run:
@@ -70,10 +64,6 @@ body:
         Confirm the bug reproduces with this config before submitting.
       render: lua
       value: |
-        vim.g.ci = {
-          debug = true,
-        }
-
         vim.pack.add({
           'https://forge.barrettruth.com/barrettruth/ci.nvim',
         })
