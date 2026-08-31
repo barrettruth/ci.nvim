@@ -43,10 +43,6 @@ local reports = {}
 ---@type table<integer, uv.uv_timer_t>
 local timers = {}
 
---- Set while a poll reloads a buffer, so the refresh is silent: the reader
---- asked once, and a message every tick would be worse than none.
-local quiet = false
-
 ---@type table<integer, boolean>
 local reported = {}
 
@@ -132,10 +128,7 @@ end
 ---@param buf integer
 ---@return boolean ok
 function M.reload(buf)
-  quiet = true
-  local ok = pcall(M.load, buf, api.nvim_buf_get_name(buf))
-  quiet = false
-  return ok
+  return pcall(M.load, buf, api.nvim_buf_get_name(buf), true)
 end
 
 --- Keeps {buf} polling for a while whatever it looks like.
@@ -265,7 +258,11 @@ end
 
 ---@param buf integer
 ---@param err string
-function M.fail(buf, err)
+---@param quiet? boolean
+function M.fail(buf, err, quiet)
+  if quiet == nil then
+    quiet = reports[buf] == nil
+  end
   vim.bo[buf].busy = 0
   settle(buf, 'failed')
   if kept[buf] then
@@ -434,10 +431,11 @@ end
 
 ---@param buf integer
 ---@param uri string
-function M.load(buf, uri)
+---@param quiet? boolean
+function M.load(buf, uri, quiet)
   local u = M.parse(uri)
   if not u then
-    return M.fail(buf, ('malformed ci:// URI: %s'):format(uri))
+    return M.fail(buf, ('malformed ci:// URI: %s'):format(uri), false)
   end
 
   vim.bo[buf].buftype = 'nofile'

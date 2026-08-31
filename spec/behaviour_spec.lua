@@ -1,5 +1,6 @@
 local buf = require('ci.buf')
 local gh = require('ci.gh')
+local msg = require('ci.msg')
 
 local LOG = table.concat({
   '2026-07-27T15:14:08.0000000Z ##[group]Setup',
@@ -122,6 +123,27 @@ describe('a job log', function()
       return vim.bo[b].busy == 0
     end)
     assert.same(before, text(b))
+  end)
+
+  it('reports a repeatedly failing poll once', function()
+    local b = open('ci://github.com/o/r/job/22')
+    stub({
+      log = function(cb)
+        cb(nil, 'gh: connection refused')
+      end,
+    })
+    local original, errors = msg.err, {}
+    msg.err = function(err)
+      errors[#errors + 1] = err
+    end
+    for _ = 1, 2 do
+      buf.reload(b)
+      vim.wait(2000, function()
+        return vim.bo[b].busy == 0
+      end)
+    end
+    msg.err = original
+    assert.same({ 'gh: connection refused' }, errors)
   end)
 end)
 
