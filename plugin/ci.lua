@@ -141,12 +141,13 @@ vim.api.nvim_create_autocmd({ 'BufWinEnter', 'BufReadPost' }, {
   end,
 })
 
-local refs = { at = 0, list = {} }
+local refs = { at = 0, dir = '', list = {} }
 
 ---@param lead string
 ---@return string[]
 local function complete(lead)
-  if vim.uv.now() - refs.at > 1000 then
+  local dir = vim.fn.getcwd()
+  if refs.dir ~= dir or vim.uv.now() - refs.at > 1000 then
     local r = vim
       .system({
         'git',
@@ -157,7 +158,11 @@ local function complete(lead)
         'refs/remotes',
       }, { text = true })
       :wait()
-    refs = { at = vim.uv.now(), list = vim.split(r.stdout or '', '\n', { trimempty = true }) }
+    refs = {
+      at = vim.uv.now(),
+      dir = dir,
+      list = vim.split(r.stdout or '', '\n', { trimempty = true }),
+    }
   end
   return vim.tbl_filter(function(x)
     return vim.startswith(x, lead)
