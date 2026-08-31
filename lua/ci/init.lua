@@ -181,7 +181,8 @@ function M.run(arg, mods)
   end
   -- There is no buffer yet to mark busy while a target is resolved.
   local shown = arg ~= '' and arg or 'HEAD'
-  local report = waits(t) and msg.progress(('Resolving %s'):format(shown))
+  local report = waits(t)
+    and msg.progress(('Resolving %s'):format(shown), ('Resolved %s'):format(shown))
   -- Resolving a target is a round trip, and the window it was asked from is
   -- the one it belongs in, not whichever happens to be current by the time
   -- the answer lands.

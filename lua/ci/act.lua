@@ -186,8 +186,9 @@ end
 ---@param t ci.act.Target
 ---@param what ci.gh.Act
 ---@param doing string
-local function send(buf, t, what, doing)
-  local report = msg.progress(doing)
+---@param done string
+local function send(buf, t, what, doing, done)
+  local report = msg.progress(doing, done)
   -- By the time an answer comes back the current window is wherever you
   -- wandered to.
   local win = api.nvim_get_current_win()
@@ -245,7 +246,13 @@ local function offer(buf, t)
       )
     or ('Re-run %s %d%s? [y/N] '):format(run_noun, t.run, tag(t))
   confirm(prompt, function()
-    send(buf, t, what, ('Re-running %s %d'):format(run_noun, t.run))
+    send(
+      buf,
+      t,
+      what,
+      ('Re-running %s %d'):format(run_noun, t.run),
+      ('Re-ran %s %d'):format(run_noun, t.run)
+    )
   end, function()
     busy[buf] = nil
   end)
@@ -299,7 +306,8 @@ function M.play()
   end
   busy[buf] = true
   confirm(('Start %s? [y/N] '):format(check.name), function()
-    local report = msg.progress(('Starting %s'):format(check.name))
+    local report =
+      msg.progress(('Starting %s'):format(check.name), ('Started %s'):format(check.name))
     play(check.job_id, b.repo, function(err)
       busy[buf] = nil
       if err then
@@ -335,7 +343,13 @@ function M.cancel()
       )
     or ('Cancel %s %d%s? [y/N] '):format(run_noun, t.run, tag(t))
   confirm(prompt, function()
-    send(buf, t, force and 'force-cancel' or 'cancel', ('Cancelling %s %d'):format(run_noun, t.run))
+    send(
+      buf,
+      t,
+      force and 'force-cancel' or 'cancel',
+      ('Cancelling %s %d'):format(run_noun, t.run),
+      ('Cancelled %s %d'):format(run_noun, t.run)
+    )
   end, function()
     busy[buf] = nil
   end)

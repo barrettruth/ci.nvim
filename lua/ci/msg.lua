@@ -24,13 +24,14 @@ end
 --- Handing the id back is what makes one message change rather than many
 --- queue up.
 ---@param what string
+---@param done string
 ---@return fun(status: 'running'|'success'|'failed', percent?: integer)
-function M.progress(what)
+function M.progress(what, done)
   local o = { kind = 'progress', source = 'ci', title = 'ci', status = 'running' }
   o.id = vim.api.nvim_echo({ { what } }, false, o)
   return function(status, percent)
     o.status, o.percent = status, percent
-    vim.api.nvim_echo({ { status == 'running' and what or '' } }, false, o)
+    vim.api.nvim_echo({ { status == 'success' and done or what } }, false, o)
   end
 end
 

@@ -470,9 +470,11 @@ function M.load(buf, uri, quiet)
   vim.bo[buf].busy = 1
   settle(buf, 'success')
   if not quiet then
-    reports[buf] = msg.progress(
-      ('Loading %s %s'):format(u.repo, u.kind == 'checks' and 'checks' or u.kind .. ' ' .. u.id)
+    local target = ('%s %s'):format(
+      u.repo,
+      u.kind == 'checks' and 'checks' or u.kind .. ' ' .. u.id
     )
+    reports[buf] = msg.progress(('Loading %s'):format(target), ('Loaded %s'):format(target))
   end
 
   if u.kind == 'job' then
