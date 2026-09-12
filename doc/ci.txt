@@ -20,7 +20,7 @@ REQUIREMENTS                                                 *ci-requirements*
 ==============================================================================
 INSTALL                                                           *ci-install*
 
-With |vim.pack| (Neovim 0.12+): >lua
+With |vim.pack|: >lua
     vim.pack.add({
       'https://forge.barrettruth.com/barrettruth/ci.nvim',
     })
@@ -39,16 +39,17 @@ COMMAND                                                          *ci-commands*
                         `:CI 123` works on every forge. Optionally, prefix
                         with `#` on GitHub and Forgejo, `!` on GitLab.
 
-:CI {rev}               Show checks for a git revision, or the working state
-                        if unspecified. {rev} is resolved by GitHub, not
-                        locally (`:CI master` is the real tip of master rather
-                        than a possibly stale local ref). Accepts anything
-                        git-rev-parse accepts: branches, tags, SHAs,
-                        `master~3`, etc. Non-commits and ranges are rejected.
+:CI {rev}               Show checks for a git revision. GitHub resolves
+                        expressions against the remote's refs. GitLab accepts
+                        branches, tags and SHAs, resolving `HEAD` locally;
+                        expressions such as `HEAD~3` are not supported there.
+                        Forgejo resolves revisions with local `git rev-parse`.
+                        Non-commits and ranges are rejected.
 
-                        WARNING: an all-digit {rev} is read as a pull request
-                        number. Write `:CI 123^{commit}` or
-                        `:CI refs/heads/123` for the revision.
+                        WARNING: an all-digit {rev} is read as a pull or merge
+                        request number. Use `:CI refs/heads/123` for a numeric
+                        branch name. `:CI 123^{commit}` works on GitHub and
+                        Forgejo, but not GitLab.
 
 :CI {url}               Show a forge URL. Recognised on github.com:
                           .../actions/runs/{run}/job/{job}    a job log

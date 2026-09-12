@@ -16,11 +16,14 @@ real ANSI colours, step-level folds, and more.
 
 - Neovim 0.13+
 - `git`
-- One if [`gh`](https://cli.github.com) for github.com, [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com, or  [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+
+- At least one of:
+  - [`gh`](https://cli.github.com), authenticated (`gh auth login`), for github.com
+  - [`glab`](https://gitlab.com/gitlab-org/cli), authenticated (`glab auth login`), for gitlab.com
+  - [`tea`](https://gitea.com/gitea/tea), authenticated (`tea login add`), for Forgejo 16+
 
 ## Installation
 
-With `vim.pack` (Neovim 0.12+):
+With `vim.pack`:
 
 ```lua
 vim.pack.add({
@@ -41,12 +44,12 @@ luarocks install ci.nvim
 :CI
 :CI 123
 
-" any git revision
+" git revision
 :CI master
 :CI v0.11.0
 :CI HEAD~3
 
-" any github.com, gitlab.com or Forgejo CI URL
+" github.com, gitlab.com or Forgejo CI URLs
 :CI https://github.com/neovim/neovim/actions/runs/30208531214/job/89810718120
 :CI https://github.com/neovim/neovim/pull/40993
 :CI https://gitlab.com/gitlab-org/cli/-/pipelines/2767853157
@@ -57,10 +60,14 @@ luarocks install ci.nvim
 :CI .
 ```
 
-Work with a `ci://` buffer via neovim-native mappings. `<CR>` opens the check
-under the cursor — or, on GitLab, the child pipeline a trigger job started —
-`-` goes back to the list you came from, `cr` re-runs, `cc` cancels, `cp`
-starts a manual job, walk job steps with `[[` and `]]`, and more.
+Without an argument, `:CI` falls back to branch-head checks if no pull request
+is open.
+
+Work with a `ci://` buffer via buffer-local mappings. `<CR>` opens the check
+under the cursor, and `-` goes back to the list you came from. Walk log steps
+or sections with `[[` and `]]`.
+
+Automatic refresh is best-effort. Use `R` or `:e` to reload a stale buffer.
 
 ## Documentation
 
@@ -70,17 +77,13 @@ starts a manual job, walk job steps with `[[` and `]]`, and more.
 
 ## Known limitations
 
-- **Numbers (all forges)**: a bare `:CI 123` is a pull request, so a revision that is all digits needs `:CI 123^{commit}` or `:CI refs/heads/123`.
-- **In-progress jobs (GitHub)**: gh [does not support this](https://github.com/cli/cli/issues/3484). In-progress checks/jobs display their step status only, until completion.
-- **In-progress jobs (GitLab)**: GitLab pushes a running job's trace in bursts tens of seconds apart, so the log follows at that pace however often it is polled.
+- **Numbers (all forges)**: a bare `:CI 123` is a pull or merge request. Use `:CI refs/heads/123` for a numeric branch name.
+- **In-progress jobs (GitHub)**: gh [cannot fetch running logs](https://github.com/cli/cli/issues/3484). Running jobs display their step status instead.
+- **In-progress jobs (GitLab)**: pipeline views show job statuses. Opening a job follows its trace best-effort; updates can arrive in bursts tens of seconds apart.
 - **Steps (GitLab)**: jobs have no steps, so a log's own sections fold in their place and `[[`/`]]` move between sections. Nothing folds beneath them.
 - **Stages (GitLab)**: a checks list names no stage, because a commit's statuses do not carry one. A pipeline's own job list does.
-- **Re-run and cancel (GitLab)**: retrying a pipeline reaches its failed and canceled jobs and no others, so `cr` on a green pipeline says so rather than asking. A cancel under way cannot be hurried, so a second `cc` says that rather than offering a force GitLab does not have.
-- **Revisions (GitLab)**: not resolved by the server, so `:CI {rev}` takes a branch, tag or SHA, and `:CI HEAD` is answered locally.
-- **Re-run and cancel (Forgejo)**: not supported.
-- **Steps (Forgejo)**: no step names or step folds. The boundaries exist in Forgejo's database but are not served by its API.
-- **Revisions (Forgejo)**: resolved with local `git rev-parse`, not by the server, so `:CI master` is your last fetch (may differ from the remote's ref).
-- **Forks (Forgejo)**: `tea` resolves by remote name, preferring `upstream` over `origin`, rather than by asking the forge which repository is the base. A fork whose parent is not named `upstream` is queried as itself, and an `upstream` on a different forge is looked up on the wrong host.
-- **Bare job ids (Forgejo)**: there is no single-job endpoint, so a job opened from a pasted URL shows its log without a name or status.
-- **Attempts (Forgejo)**: a job id is stable across reruns and always shows the newest attempt (in contrast, GitHub mints new ids and pins). Older attempts are not reachable.
-- **Old run URLs (Forgejo)**: a run URL names the run by its index, which is turned into an id by searching the last 100 runs. Older links report that rather than resolving.
+- **Revisions (GitLab)**: branches, tags and SHAs are resolved by the server; `HEAD` is resolved locally. Git revision expressions such as `HEAD~3` are not supported.
+- **In-progress jobs (Forgejo)**: logs are reloaded in full until a runner completion marker is found. A job buffer's status is not refreshed.
+- **Re-run and cancel (Forgejo)**: unsuppported
+- **Steps (Forgejo)**: logs fold on `##[group]` alone, which may be less
+  accurate than Github and GitLab.
