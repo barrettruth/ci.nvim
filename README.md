@@ -16,9 +16,7 @@ real ANSI colours, step-level folds, and more.
 
 - Neovim 0.13+
 - `git`
-- (Optionally) [`gh`](https://cli.github.com) for github.com
-- (Optionally) [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com
-- (Optionally) [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+
+- One if [`gh`](https://cli.github.com) for github.com, [`glab`](https://gitlab.com/gitlab-org/cli) for gitlab.com, or  [`tea`](https://gitea.com/gitea/tea) for Forgejo 16+
 
 ## Installation
 
@@ -43,7 +41,7 @@ luarocks install ci.nvim
 :CI
 :CI 123
 
-" any git revision, resolved by GitHub rather than locally
+" any git revision
 :CI master
 :CI v0.11.0
 :CI HEAD~3
