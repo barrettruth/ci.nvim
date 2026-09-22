@@ -2,10 +2,6 @@
 
 **GitHub Actions, GitLab CI/CD and Forgejo Actions in Neovim**
 
-> [!NOTE]
-> Active development is hosted on
-> [Forgejo](https://forge.barrettruth.com/barrettruth/ci.nvim).
-
 ![ci.nvim](assets/ci.webp)
 
 Experience the power of `:CI`. Native CI logs in normal Neovim buffers with
