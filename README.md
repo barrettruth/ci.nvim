@@ -2,7 +2,7 @@
 
 **GitHub Actions, GitLab CI/CD and Forgejo Actions in Neovim**
 
-![ci.nvim](assets/ci.webp)
+![ci.nvim](https://forge.barrettruth.com/attachments/cd65d168-cc7b-413a-bcce-219d128c5297)
 
 Experience the power of `:CI`. Native CI logs in normal Neovim buffers with
 real ANSI colours, step-level folds, and more.
