@@ -3,11 +3,10 @@
 **GitHub Actions, GitLab CI/CD and Forgejo Actions in Neovim**
 
 > [!NOTE]
-> Development, issues, and pull requests happen on
+> Active development is hosted on
 > [Forgejo](https://forge.barrettruth.com/barrettruth/ci.nvim).
-> GitHub is maintained as a read-only mirror.
 
-<img width="1728" height="1057" alt="image" src="https://github.com/user-attachments/assets/306e710e-6f80-4e0d-b00d-632acdcaf9b9" />
+![ci.nvim](assets/ci.webp)
 
 Experience the power of `:CI`. Native CI logs in normal Neovim buffers with
 real ANSI colours, step-level folds, and more.
