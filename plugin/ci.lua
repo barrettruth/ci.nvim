@@ -3,6 +3,10 @@ if vim.g.loaded_ci then
 end
 vim.g.loaded_ci = 1
 
+pcall(function()
+  require('ci.migration').warn_if_github_source()
+end)
+
 local hl = {
   CiPass = 'DiagnosticOk',
   CiFail = 'DiagnosticError',

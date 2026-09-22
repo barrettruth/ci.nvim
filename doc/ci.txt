@@ -28,6 +28,15 @@ With |vim.pack|: >lua
     luarocks install ci.nvim
 <
 ==============================================================================
+MIGRATION                                                       *ci-migration*
+
+ci.nvim will be removed from GitHub on October 31, 2026. Update your plugin
+source to Forgejo: >lua
+    vim.pack.add({
+      'https://forge.barrettruth.com/barrettruth/ci.nvim',
+    })
+<
+==============================================================================
 COMMAND                                                          *ci-commands*
 
                                                                          *:CI*
