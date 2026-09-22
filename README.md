@@ -30,12 +30,6 @@ vim.pack.add({
 })
 ```
 
-Or via [luarocks](https://luarocks.org/modules/barrettruth/ci.nvim):
-
-```
-luarocks install ci.nvim
-```
-
 ## Usage
 
 ```vim

@@ -24,9 +24,6 @@ With |vim.pack|: >lua
     vim.pack.add({
       'https://forge.barrettruth.com/barrettruth/ci.nvim',
     })
-< Or via luarocks: >
-    luarocks install ci.nvim
-<
 ==============================================================================
 MIGRATION                                                       *ci-migration*
 
